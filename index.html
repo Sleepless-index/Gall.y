@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reverse:1999 CN Asset Gallery</title>
+<style>
+  :root{
+    --bg:#0f1115;
+    --panel:#161922;
+    --border:#262b38;
+    --text:#e7e9ee;
+    --dim:#8b90a0;
+    --accent:#c9a24b;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);}
+
+  header{
+    position:sticky; top:0; z-index:10;
+    background:rgba(15,17,21,0.92);
+    backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--border);
+    padding:14px 20px;
+  }
+  .header-row{
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center; max-width:1400px; margin:0 auto;
+  }
+  h1{
+    font-size:15px; font-weight:600; margin:0; white-space:nowrap; letter-spacing:0.02em;
+    color:var(--text);
+  }
+  h1 span{color:var(--accent);}
+
+  #search{
+    flex:1; min-width:180px;
+    background:var(--panel); border:1px solid var(--border); color:var(--text);
+    padding:8px 12px; border-radius:6px; font-size:14px; font-family:var(--mono);
+  }
+  #search:focus{outline:1px solid var(--accent); border-color:var(--accent);}
+
+  select{
+    background:var(--panel); border:1px solid var(--border); color:var(--text);
+    padding:8px 10px; border-radius:6px; font-size:13px; font-family:var(--mono);
+    max-width:220px;
+  }
+
+  #status{
+    font-size:12px; color:var(--dim); font-family:var(--mono); white-space:nowrap;
+  }
+
+  main{max-width:1400px; margin:0 auto; padding:18px 20px 60px;}
+
+  #loadbar{
+    height:2px; background:var(--border); position:relative; overflow:hidden; margin-bottom:16px; border-radius:2px;
+    display:none;
+  }
+  #loadbar.active{display:block;}
+  #loadbar .fill{
+    position:absolute; left:0; top:0; height:100%; width:30%;
+    background:var(--accent);
+    animation:slide 1.1s ease-in-out infinite;
+  }
+  @keyframes slide{
+    0%{left:-30%;}
+    100%{left:100%;}
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));
+    gap:10px;
+  }
+
+  .cell{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:6px;
+    overflow:hidden;
+    cursor:pointer;
+    display:flex; flex-direction:column;
+    transition:border-color 0.15s ease;
+  }
+  .cell:hover{border-color:var(--accent);}
+
+  .thumb-wrap{
+    aspect-ratio:1/1;
+    background:
+      linear-gradient(45deg, #1a1d26 25%, transparent 25%),
+      linear-gradient(-45deg, #1a1d26 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #1a1d26 75%),
+      linear-gradient(-45deg, transparent 75%, #1a1d26 75%);
+    background-size:16px 16px;
+    background-position:0 0, 0 8px, 8px -8px, -8px 0px;
+    background-color:#12141b;
+    display:flex; align-items:center; justify-content:center;
+    position:relative;
+  }
+  .thumb-wrap img{
+    width:100%; height:100%; object-fit:contain;
+    opacity:0; transition:opacity 0.2s ease;
+  }
+  .thumb-wrap img.loaded{opacity:1;}
+
+  .cell .name{
+    font-size:10.5px; font-family:var(--mono); color:var(--dim);
+    padding:6px 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    border-top:1px solid var(--border);
+  }
+
+  #sentinel{height:1px;}
+
+  #empty{
+    text-align:center; color:var(--dim); padding:60px 20px; font-size:14px;
+  }
+
+  /* Lightbox */
+  #lightbox{
+    position:fixed; inset:0; background:rgba(10,11,14,0.96);
+    display:none; align-items:center; justify-content:center; z-index:100;
+    flex-direction:column; padding:30px;
+  }
+  #lightbox.open{display:flex;}
+  #lightbox img{
+    max-width:92vw; max-height:78vh; object-fit:contain;
+    border:1px solid var(--border);
+  }
+  #lightbox .lb-meta{
+    color:var(--dim); font-family:var(--mono); font-size:12px; margin-top:14px; text-align:center; max-width:80vw; word-break:break-all;
+  }
+  #lightbox .lb-actions{margin-top:12px; display:flex; gap:10px;}
+  #lightbox .lb-actions a, #lightbox .lb-actions button{
+    background:var(--panel); border:1px solid var(--border); color:var(--text);
+    padding:7px 14px; border-radius:6px; font-size:12px; font-family:var(--mono);
+    text-decoration:none; cursor:pointer;
+  }
+  #lightbox .lb-actions a:hover, #lightbox .lb-actions button:hover{border-color:var(--accent);}
+  #lb-close{
+    position:absolute; top:18px; right:22px; background:none; border:none;
+    color:var(--dim); font-size:26px; cursor:pointer; line-height:1;
+  }
+  #lb-close:hover{color:var(--text);}
+
+  footer{
+    text-align:center; color:var(--dim); font-size:11px; font-family:var(--mono);
+    padding:30px 20px 50px;
+  }
+  footer a{color:var(--dim);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <h1>R<span>:</span>1999 <span>·</span> Asset Gallery</h1>
+    <input id="search" type="text" placeholder="filter by filename or path…">
+    <select id="folder-filter">
+      <option value="">All folders</option>
+    </select>
+    <span id="status">loading…</span>
+  </div>
+</header>
+
+<main>
+  <div id="loadbar" class="active"><div class="fill"></div></div>
+  <div id="grid" class="grid"></div>
+  <div id="empty" style="display:none;">No images match.</div>
+  <div id="sentinel"></div>
+</main>
+
+<footer>
+  Source: <a href="https://github.com/myssal/Reverse-1999-CN-Asset" target="_blank" rel="noopener">myssal/Reverse-1999-CN-Asset</a>
+  — images served live from raw.githubusercontent.com, not hosted here.
+</footer>
+
+<div id="lightbox">
+  <button id="lb-close">&times;</button>
+  <img id="lb-img" src="" alt="">
+  <div class="lb-meta" id="lb-path"></div>
+  <div class="lb-actions">
+    <a id="lb-open" href="#" target="_blank" rel="noopener">Open raw</a>
+    <a id="lb-github" href="#" target="_blank" rel="noopener">View on GitHub</a>
+    <button id="lb-copy">Copy path</button>
+  </div>
+</div>
+
+<script>
+const OWNER = "myssal";
+const REPO = "Reverse-1999-CN-Asset";
+const BRANCH = "master";
+const IMAGE_EXT = /\.(png|jpe?g|webp|gif)$/i;
+
+const RAW_BASE = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/`;
+const BLOB_BASE = `https://github.com/${OWNER}/${REPO}/blob/${BRANCH}/`;
+const TREE_API = `https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`;
+
+const grid = document.getElementById('grid');
+const statusEl = document.getElementById('status');
+const searchEl = document.getElementById('search');
+const folderEl = document.getElementById('folder-filter');
+const loadbar = document.getElementById('loadbar');
+const emptyEl = document.getElementById('empty');
+const sentinel = document.getElementById('sentinel');
+
+let allImages = [];   // { path, name, folder }
+let filtered = [];
+let renderedCount = 0;
+const BATCH = 60;
+
+async function init(){
+  try{
+    const res = await fetch(TREE_API);
+    if(!res.ok){
+      if(res.status === 403){
+        statusEl.textContent = "rate limited by GitHub API — try again in a bit";
+      } else {
+        statusEl.textContent = `error loading file list (${res.status})`;
+      }
+      loadbar.classList.remove('active');
+      return;
+    }
+    const data = await res.json();
+    if(data.truncated){
+      statusEl.textContent = "warning: file list truncated by GitHub (repo very large)";
+    }
+    const tree = data.tree || [];
+    allImages = tree
+      .filter(item => item.type === 'blob' && IMAGE_EXT.test(item.path))
+      .map(item => {
+        const parts = item.path.split('/');
+        const name = parts[parts.length - 1];
+        const folder = parts.slice(0, -1).join('/') || '(root)';
+        return { path: item.path, name, folder };
+      });
+
+    populateFolders();
+    filtered = allImages;
+    statusEl.textContent = `${allImages.length.toLocaleString()} images`;
+    loadbar.classList.remove('active');
+    renderNext();
+  } catch(err){
+    statusEl.textContent = "failed to load — check your connection";
+    loadbar.classList.remove('active');
+    console.error(err);
+  }
+}
+
+function populateFolders(){
+  const folderCounts = {};
+  allImages.forEach(img => {
+    // use top-level folder for a manageable dropdown
+    const top = img.folder.split('/')[0];
+    folderCounts[top] = (folderCounts[top] || 0) + 1;
+  });
+  const sorted = Object.entries(folderCounts).sort((a,b) => b[1]-a[1]);
+  sorted.forEach(([folder, count]) => {
+    const opt = document.createElement('option');
+    opt.value = folder;
+    opt.textContent = `${folder} (${count.toLocaleString()})`;
+    folderEl.appendChild(opt);
+  });
+}
+
+function applyFilters(){
+  const q = searchEl.value.trim().toLowerCase();
+  const folder = folderEl.value;
+  filtered = allImages.filter(img => {
+    if(folder && !img.folder.startsWith(folder)) return false;
+    if(q && !img.path.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  grid.innerHTML = '';
+  renderedCount = 0;
+  statusEl.textContent = `${filtered.length.toLocaleString()} images`;
+  emptyEl.style.display = filtered.length === 0 ? 'block' : 'none';
+  renderNext();
+}
+
+function renderNext(){
+  const slice = filtered.slice(renderedCount, renderedCount + BATCH);
+  if(slice.length === 0) return;
+
+  const fragment = document.createDocumentFragment();
+  slice.forEach(img => {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'thumb-wrap';
+
+    const imEl = document.createElement('img');
+    imEl.loading = 'lazy';
+    imEl.decoding = 'async';
+    imEl.src = RAW_BASE + img.path.split('/').map(encodeURIComponent).join('/');
+    imEl.alt = img.name;
+    imEl.addEventListener('load', () => imEl.classList.add('loaded'));
+    imEl.addEventListener('error', () => { wrap.style.display = 'none'; });
+
+    wrap.appendChild(imEl);
+    cell.appendChild(wrap);
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'name';
+    nameEl.textContent = img.name;
+    cell.appendChild(nameEl);
+
+    cell.addEventListener('click', () => openLightbox(img));
+
+    fragment.appendChild(cell);
+  });
+  grid.appendChild(fragment);
+  renderedCount += slice.length;
+}
+
+// Infinite scroll
+const observer = new IntersectionObserver(entries => {
+  if(entries[0].isIntersecting) renderNext();
+}, { rootMargin: '400px' });
+observer.observe(sentinel);
+
+// Lightbox
+const lightbox = document.getElementById('lightbox');
+const lbImg = document.getElementById('lb-img');
+const lbPath = document.getElementById('lb-path');
+const lbOpen = document.getElementById('lb-open');
+const lbGithub = document.getElementById('lb-github');
+const lbCopy = document.getElementById('lb-copy');
+
+function openLightbox(img){
+  const rawUrl = RAW_BASE + img.path.split('/').map(encodeURIComponent).join('/');
+  lbImg.src = rawUrl;
+  lbPath.textContent = img.path;
+  lbOpen.href = rawUrl;
+  lbGithub.href = BLOB_BASE + img.path.split('/').map(encodeURIComponent).join('/');
+  lightbox.classList.add('open');
+}
+document.getElementById('lb-close').addEventListener('click', () => lightbox.classList.remove('open'));
+lightbox.addEventListener('click', e => { if(e.target === lightbox) lightbox.classList.remove('open'); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape') lightbox.classList.remove('open'); });
+lbCopy.addEventListener('click', () => {
+  navigator.clipboard.writeText(lbPath.textContent);
+  lbCopy.textContent = 'Copied!';
+  setTimeout(() => lbCopy.textContent = 'Copy path', 1200);
+});
+
+// Filters
+let debounceTimer;
+searchEl.addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(applyFilters, 200);
+});
+folderEl.addEventListener('change', applyFilters);
+
+init();
+</script>
+</body>
+</html>
