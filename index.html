@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reverse:1999 CN Asset Gallery</title>
+<title>Gall.y</title>
 <style>
   :root{
     --bg:#0f1115;
@@ -148,13 +148,40 @@
     padding:30px 20px 50px;
   }
   footer a{color:var(--dim);}
+
+  @media (max-width: 640px){
+    header{padding:10px 12px;}
+    .header-row{gap:8px;}
+    h1{font-size:14px; width:100%;}
+    #search{min-width:0; flex:1 1 100%; order:3; font-size:16px;}
+    select{flex:1 1 auto; font-size:12px; max-width:none;}
+    #status{flex:0 0 auto; order:4;}
+
+    main{padding:12px 10px 40px;}
+
+    .grid{
+      grid-template-columns:repeat(auto-fill, minmax(104px, 1fr));
+      gap:7px;
+    }
+    .cell .name{font-size:9.5px; padding:5px 6px;}
+
+    #lightbox{padding:14px;}
+    #lightbox img{max-height:60vh;}
+    #lb-close{top:10px; right:14px; font-size:30px;}
+    .lb-actions{flex-wrap:wrap; justify-content:center;}
+    .lb-actions a, .lb-actions button{padding:9px 14px; font-size:13px;}
+  }
+
+  @media (hover: none){
+    .cell:active{border-color:var(--accent);}
+  }
 </style>
 </head>
 <body>
 
 <header>
   <div class="header-row">
-    <h1>R<span>:</span>1999 <span>·</span> Asset Gallery</h1>
+    <h1>Gall<span>.</span>y</h1>
     <input id="search" type="text" placeholder="filter by filename or path…">
     <select id="folder-filter">
       <option value="">All folders</option>
@@ -226,8 +253,10 @@ async function init(){
       statusEl.textContent = "warning: file list truncated by GitHub (repo very large)";
     }
     const tree = data.tree || [];
+    const ALLOWED_PREFIXES = ['singlebg/', 'live2d/roles/'];
     allImages = tree
       .filter(item => item.type === 'blob' && IMAGE_EXT.test(item.path))
+      .filter(item => ALLOWED_PREFIXES.some(prefix => item.path.startsWith(prefix)))
       .map(item => {
         const parts = item.path.split('/');
         const name = parts[parts.length - 1];
