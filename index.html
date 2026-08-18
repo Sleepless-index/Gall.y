@@ -6,14 +6,15 @@
 <title>Gall.y</title>
 <style>
   :root{
-    --bg:#0f1115;
-    --panel:#161922;
-    --panel2:#1b1f2a;
-    --border:#262b38;
-    --text:#e7e9ee;
-    --dim:#8b90a0;
-    --accent:#c9a24b;
-    --active:#232a3d;
+    --bg:#0f0f14;
+    --panel:#16161f;
+    --panel2:#1c1c28;
+    --border:#28283a;
+    --text:#e7e7ee;
+    --dim:#8b8b9e;
+    --accent:#818cf8;
+    --accent-dim:#4f46e5;
+    --active:#242440;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --sidebar-w:280px;
@@ -21,6 +22,7 @@
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);height:100%;}
   body{display:flex; min-height:100vh;}
+  body.modal-open{overflow:hidden; height:100vh;}
 
   /* ---------- Sidebar ---------- */
   #sidebar{
@@ -53,38 +55,58 @@
   #tree::-webkit-scrollbar{width:8px;}
   #tree::-webkit-scrollbar-thumb{background:var(--border); border-radius:4px;}
 
-  .tsection-label{
-    font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--dim);
-    padding:10px 10px 4px;
+  .tdivider{
+    height:1px; background:var(--border); margin:10px 8px;
   }
-  .tsection-label:first-child{padding-top:4px;}
+  .tsection-label{
+    font-size:10px; text-transform:uppercase; letter-spacing:0.07em; color:var(--dim);
+    padding:8px 10px 4px;
+    font-weight:600;
+  }
 
   .tnode{ user-select:none; }
   .trow{
     display:flex; align-items:center; gap:6px;
-    padding:7px 8px; border-radius:6px; cursor:pointer;
+    padding:7px 8px; border-radius:6px;
     font-size:13.5px; color:var(--text);
     white-space:nowrap;
   }
   .trow:hover{background:var(--panel2);}
-  .trow.selected{background:var(--active); font-weight:600;}
-  .trow .chev{
-    width:14px; flex:0 0 14px; text-align:center; color:var(--dim);
-    transition:transform 0.12s ease; font-size:11px;
+  .trow.selected{background:var(--active); font-weight:600; color:var(--accent);}
+
+  .chev-btn{
+    width:18px; height:18px; flex:0 0 18px;
+    display:flex; align-items:center; justify-content:center;
+    background:none; border:none; color:var(--dim); cursor:pointer;
+    padding:0; border-radius:4px;
   }
-  .trow.open > .chev{transform:rotate(90deg);}
-  .trow .folder-icon{flex:0 0 auto; opacity:0.85;}
-  .trow .label{overflow:hidden; text-overflow:ellipsis;}
-  .trow .count{
+  .chev-btn:hover{background:var(--border); color:var(--text);}
+  .chev-btn svg{transition:transform 0.12s ease;}
+  .trow.open .chev-btn svg{transform:rotate(90deg);}
+  .chev-spacer{width:18px; flex:0 0 18px;}
+
+  .row-main{
+    display:flex; align-items:center; gap:7px; flex:1; min-width:0; cursor:pointer;
+    padding:1px 0;
+  }
+  .folder-dot{
+    flex:0 0 auto; width:6px; height:6px; border-radius:50%;
+    background:var(--dim); opacity:0.6;
+  }
+  .trow.selected .folder-dot{background:var(--accent); opacity:1;}
+  .star-icon{flex:0 0 auto; color:var(--accent); font-size:12px;}
+  .all-icon{flex:0 0 auto; width:6px; height:6px; border-radius:1px; background:var(--dim);}
+
+  .label{overflow:hidden; text-overflow:ellipsis;}
+  .count{
     margin-left:auto; color:var(--dim); font-size:11px; font-family:var(--mono);
     flex:0 0 auto; padding-left:8px;
   }
   .children{
-    margin-left:18px; border-left:1px solid var(--border); padding-left:2px;
+    margin-left:20px; border-left:1px solid var(--border); padding-left:4px;
     display:none;
   }
   .children.open{display:block;}
-  .tnode.leaf > .trow .chev{visibility:hidden;}
 
   .sb-footer{
     padding:10px 14px; border-top:1px solid var(--border);
@@ -96,7 +118,8 @@
   #sb-toggle{
     display:none;
     position:fixed; bottom:18px; right:18px; z-index:50;
-    background:var(--accent); color:#191305; border:none;
+    background:var(--accent); color:#14142080; border:none;
+    color:#0f0f14;
     width:50px; height:50px; border-radius:50%;
     font-size:20px; cursor:pointer;
     box-shadow:0 4px 14px rgba(0,0,0,0.4);
@@ -112,7 +135,7 @@
 
   #topbar{
     position:sticky; top:0; z-index:10;
-    background:rgba(15,17,21,0.92); backdrop-filter:blur(6px);
+    background:rgba(15,15,20,0.92); backdrop-filter:blur(6px);
     border-bottom:1px solid var(--border);
     padding:14px 22px;
     display:flex; align-items:center; gap:12px; flex-wrap:wrap;
@@ -149,7 +172,7 @@
     padding:9px 20px; border-radius:6px; font-size:13px; font-family:var(--mono);
     cursor:pointer;
   }
-  #retry-btn:hover{background:var(--accent); color:#191305;}
+  #retry-btn:hover{background:var(--accent); color:#0f0f14;}
 
   .grid{
     display:grid;
@@ -171,13 +194,13 @@
   .thumb-wrap{
     aspect-ratio:1/1;
     background:
-      linear-gradient(45deg, #1a1d26 25%, transparent 25%),
-      linear-gradient(-45deg, #1a1d26 25%, transparent 25%),
-      linear-gradient(45deg, transparent 75%, #1a1d26 75%),
-      linear-gradient(-45deg, transparent 75%, #1a1d26 75%);
+      linear-gradient(45deg, #1c1c28 25%, transparent 25%),
+      linear-gradient(-45deg, #1c1c28 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #1c1c28 75%),
+      linear-gradient(-45deg, transparent 75%, #1c1c28 75%);
     background-size:16px 16px;
     background-position:0 0, 0 8px, 8px -8px, -8px 0px;
-    background-color:#12141b;
+    background-color:#131319;
     display:flex; align-items:center; justify-content:center;
     position:relative;
   }
@@ -203,9 +226,10 @@
 
   /* Lightbox */
   #lightbox{
-    position:fixed; inset:0; background:rgba(10,11,14,0.96);
+    position:fixed; inset:0; background:rgba(8,8,11,0.96);
     display:none; align-items:center; justify-content:center; z-index:100;
     flex-direction:column; padding:30px;
+    overflow-y:auto;
   }
   #lightbox.open{display:flex;}
   #lightbox img, #lightbox video{ max-width:92vw; max-height:70vh; object-fit:contain; border:1px solid var(--border); }
@@ -223,10 +247,10 @@
     padding:7px 14px; border-radius:6px; font-size:12px; font-family:var(--mono);
     text-decoration:none; cursor:pointer;
   }
-  #lightbox .lb-actions a:hover, #lightbox .lb-actions button:hover{border-color:var(--accent);}
+  #lightbox .lb-actions a:hover, #lightbox .lb-actions button:hover{border-color:var(--accent); color:var(--accent);}
   #lb-close{
-    position:absolute; top:18px; right:22px; background:none; border:none;
-    color:var(--dim); font-size:26px; cursor:pointer; line-height:1;
+    position:fixed; top:18px; right:22px; background:none; border:none;
+    color:var(--dim); font-size:26px; cursor:pointer; line-height:1; z-index:101;
   }
   #lb-close:hover{color:var(--text);}
 
@@ -321,7 +345,6 @@
 const OWNER = "myssal";
 const REPO = "Reverse-1999-CN-Asset";
 const BRANCH = "master";
-const IMAGE_EXT = /\.(png|jpe?g|webp|gif)$/i;
 const VIDEO_EXT = /\.(mp4|webm|mov)$/i;
 const MEDIA_EXT = /\.(png|jpe?g|webp|gif|mp4|webm|mov)$/i;
 const ALLOWED_PREFIXES = ['singlebg/', 'live2d/roles/', 'atlassrc/', 'singlebg_lang/', 'video/'];
@@ -350,11 +373,12 @@ const sbOverlay = document.getElementById('sb-overlay');
 
 let allImages = [];      // { path, name, folder, isVideo }
 let folderTree = {};     // nested { name, path, count, children:{} }
-let selectedFolder = ""; // "" = everything in scope; special value "__pinned__" for favorites
+let selectedFolder = ""; // "" = everything in scope; "__pinned__" = favorites
 let searchQuery = "";
 let filtered = [];
 let renderedCount = 0;
 const BATCH = 60;
+const openFolders = new Set(); // persists expand state across re-renders
 
 async function init(){
   loadbar.classList.add('active');
@@ -423,97 +447,164 @@ function pinnedCount(){
   return allImages.filter(img => PINNED_PATHS.includes(img.folder)).length;
 }
 
+// alphabetical, matching GitHub's own default tree ordering
+function sortedValues(obj){
+  return Object.values(obj).sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric:true}));
+}
+
 function renderTree(){
   treeEl.innerHTML = '';
 
-  const allLabel = document.createElement('div');
-  allLabel.className = 'tsection-label';
-  allLabel.textContent = 'Browse';
-  treeEl.appendChild(allLabel);
-
-  treeEl.appendChild(makeSimpleRow("All", "", allImages.length, "🗂"));
+  treeEl.appendChild(makeSimpleRow("All", "", allImages.length, 'all'));
 
   const pCount = pinnedCount();
   if(pCount > 0){
-    treeEl.appendChild(makeSimpleRow("★ Favorites", "__pinned__", pCount, "⭐"));
+    const divider = document.createElement('div');
+    divider.className = 'tdivider';
+    treeEl.appendChild(divider);
+
+    const favLabel = document.createElement('div');
+    favLabel.className = 'tsection-label';
+    favLabel.textContent = 'Favorites';
+    treeEl.appendChild(favLabel);
+
+    PINNED_PATHS.forEach(path => {
+      const count = allImages.filter(img => img.folder === path).length;
+      if(count > 0){
+        treeEl.appendChild(makeSimpleRow(path, path, count, 'star'));
+      }
+    });
   }
 
-  Object.values(folderTree)
-    .sort((a,b) => b.count - a.count)
-    .forEach(node => treeEl.appendChild(renderNode(node)));
+  const divider2 = document.createElement('div');
+  divider2.className = 'tdivider';
+  treeEl.appendChild(divider2);
+
+  const browseLabel = document.createElement('div');
+  browseLabel.className = 'tsection-label';
+  browseLabel.textContent = 'Browse';
+  treeEl.appendChild(browseLabel);
+
+  sortedValues(folderTree).forEach(node => treeEl.appendChild(renderNode(node)));
 }
 
-function makeSimpleRow(label, path, count, icon){
+function makeSimpleRow(label, path, count, iconType){
   const row = document.createElement('div');
   row.className = 'trow' + (selectedFolder === path ? ' selected' : '');
   row.dataset.path = path;
-  row.innerHTML = `<span class="chev" style="visibility:hidden"></span><span class="folder-icon">${icon}</span><span class="label">${label}</span><span class="count">${count}</span>`;
-  row.addEventListener('click', () => selectFolder(path));
+
+  const spacer = document.createElement('span');
+  spacer.className = 'chev-spacer';
+  row.appendChild(spacer);
+
+  const main = document.createElement('div');
+  main.className = 'row-main';
+
+  const icon = document.createElement('span');
+  icon.className = iconType === 'star' ? 'star-icon' : 'all-icon';
+  if(iconType === 'star') icon.textContent = '★';
+  main.appendChild(icon);
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'label';
+  labelEl.textContent = label;
+  main.appendChild(labelEl);
+
+  const countEl = document.createElement('span');
+  countEl.className = 'count';
+  countEl.textContent = count;
+  main.appendChild(countEl);
+
+  main.addEventListener('click', () => selectFolder(path));
+  row.appendChild(main);
   return row;
 }
 
 function renderNode(node){
   const wrap = document.createElement('div');
   const hasChildren = Object.keys(node.children).length > 0;
-  wrap.className = 'tnode' + (hasChildren ? '' : ' leaf');
+  wrap.className = 'tnode';
+
+  const isOpen = openFolders.has(node.path);
 
   const row = document.createElement('div');
-  row.className = 'trow' + (selectedFolder === node.path ? ' selected' : '');
+  row.className = 'trow' + (selectedFolder === node.path ? ' selected' : '') + (isOpen ? ' open' : '');
   row.dataset.path = node.path;
-  row.innerHTML = `<span class="chev">›</span><span class="folder-icon">📁</span><span class="label">${node.name}</span><span class="count">${node.count}</span>`;
 
-  const childWrap = document.createElement('div');
-  childWrap.className = 'children';
-
-  row.addEventListener('click', () => {
-    selectFolder(node.path);
-    if(hasChildren){
-      const isOpen = childWrap.classList.toggle('open');
-      row.classList.toggle('open', isOpen);
-    }
-  });
-
-  wrap.appendChild(row);
   if(hasChildren){
-    Object.values(node.children)
-      .sort((a,b) => b.count - a.count)
-      .forEach(child => childWrap.appendChild(renderNode(child)));
+    const chevBtn = document.createElement('button');
+    chevBtn.className = 'chev-btn';
+    chevBtn.setAttribute('aria-label', 'Toggle');
+    chevBtn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10"><path d="M3 1L7 5L3 9" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    chevBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleFolder(node.path);
+    });
+    row.appendChild(chevBtn);
+  } else {
+    const spacer = document.createElement('span');
+    spacer.className = 'chev-spacer';
+    row.appendChild(spacer);
+  }
+
+  const main = document.createElement('div');
+  main.className = 'row-main';
+
+  const dot = document.createElement('span');
+  dot.className = 'folder-dot';
+  main.appendChild(dot);
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'label';
+  labelEl.textContent = node.name;
+  main.appendChild(labelEl);
+
+  const countEl = document.createElement('span');
+  countEl.className = 'count';
+  countEl.textContent = node.count;
+  main.appendChild(countEl);
+
+  main.addEventListener('click', () => selectFolder(node.path));
+  row.appendChild(main);
+  wrap.appendChild(row);
+
+  if(hasChildren){
+    const childWrap = document.createElement('div');
+    childWrap.className = 'children' + (isOpen ? ' open' : '');
+    sortedValues(node.children).forEach(child => childWrap.appendChild(renderNode(child)));
     wrap.appendChild(childWrap);
   }
+
   return wrap;
+}
+
+function toggleFolder(path){
+  if(openFolders.has(path)) openFolders.delete(path);
+  else openFolders.add(path);
+  renderTree();
 }
 
 function selectFolder(path){
   selectedFolder = path;
+  // auto-expand ancestor chain so the selected item stays visible
+  if(path && path !== '__pinned__' && !PINNED_PATHS.includes(path)){
+    const parts = path.split('/');
+    let acc = [];
+    for(let i = 0; i < parts.length - 1; i++){
+      acc.push(parts[i]);
+      openFolders.add(acc.join('/'));
+    }
+  }
   renderTree();
-  reopenAncestors();
   applyFilters();
   closeSidebarMobile();
-}
-
-function reopenAncestors(){
-  if(!selectedFolder || selectedFolder === '__pinned__') return;
-  const parts = selectedFolder.split('/');
-  let acc = [];
-  parts.forEach(p => {
-    acc.push(p);
-    const partial = acc.join('/');
-    const row = [...treeEl.querySelectorAll('.trow')].find(r => r.dataset.path === partial);
-    if(row){
-      const childWrap = row.nextElementSibling;
-      if(childWrap && childWrap.classList.contains('children')){
-        childWrap.classList.add('open');
-        row.classList.add('open');
-      }
-    }
-  });
 }
 
 function applyFilters(){
   const q = searchQuery.trim().toLowerCase();
   filtered = allImages.filter(img => {
-    if(selectedFolder === '__pinned__'){
-      if(!PINNED_PATHS.includes(img.folder)) return false;
+    if(PINNED_PATHS.includes(selectedFolder)){
+      if(img.folder !== selectedFolder) return false;
     } else if(selectedFolder){
       if(!(img.folder === selectedFolder || img.folder.startsWith(selectedFolder + '/'))) return false;
     }
@@ -522,7 +613,7 @@ function applyFilters(){
   });
   grid.innerHTML = '';
   renderedCount = 0;
-  const label = selectedFolder === '__pinned__' ? '★ Favorites' : (selectedFolder || 'All');
+  const label = selectedFolder || 'All';
   crumbEl.innerHTML = `<b>${label}</b> — ${filtered.length.toLocaleString()} file${filtered.length===1?'':'s'}`;
   emptyEl.style.display = filtered.length === 0 ? 'block' : 'none';
   renderNextBatch();
@@ -631,8 +722,8 @@ async function openLightbox(img){
   lbSize.textContent = '…';
   lbDate.textContent = '…';
   lightbox.classList.add('open');
+  document.body.classList.add('modal-open');
 
-  // Fetch metadata: size via contents API, last-modified date via commits API
   fetch(CONTENTS_API(img.path))
     .then(r => r.ok ? r.json() : null)
     .then(data => { lbSize.textContent = data && data.size != null ? formatBytes(data.size) : 'unavailable'; })
@@ -652,6 +743,7 @@ async function openLightbox(img){
 
 function closeLightbox(){
   lightbox.classList.remove('open');
+  document.body.classList.remove('modal-open');
   lbMedia.innerHTML = '';
 }
 document.getElementById('lb-close').addEventListener('click', closeLightbox);
