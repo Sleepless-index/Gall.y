@@ -30,7 +30,7 @@
     background:var(--panel);
     border-right:1px solid var(--border);
     display:flex; flex-direction:column;
-    height:100vh; position:sticky; top:0;
+    height:100vh; position:fixed; top:0; left:0; z-index:20;
   }
   .sb-header{
     padding:16px 16px 12px;
@@ -128,7 +128,7 @@
   }
 
   /* ---------- Main content ---------- */
-  #content{flex:1; min-width:0; display:flex; flex-direction:column;}
+  #content{margin-left:var(--sidebar-w); min-width:0; display:flex; flex-direction:column; width:calc(100% - var(--sidebar-w));}
 
   #topbar{
     position:sticky; top:0; z-index:10;
@@ -156,8 +156,11 @@
     display:none;
     align-items:center; gap:10px;
     background:var(--panel2); border:1px solid var(--accent-dim);
-    border-radius:8px; padding:10px 14px; margin-bottom:14px;
+    border-radius:10px; padding:10px 14px;
     font-family:var(--mono); font-size:12.5px; flex-wrap:wrap;
+    position:fixed; bottom:22px; left:calc(var(--sidebar-w) + 22px); right:22px;
+    z-index:45; box-shadow:0 8px 28px rgba(0,0,0,0.5);
+    max-width:640px;
   }
   #download-bar.active{display:flex;}
   #download-bar .sel-count{color:var(--text); font-weight:600;}
@@ -291,6 +294,29 @@
   }
   #lb-close:hover{color:var(--text);}
 
+  /* ---------- Custom confirm modal ---------- */
+  #confirm-modal{
+    display:none;
+    position:fixed; inset:0; background:rgba(8,8,11,0.72); z-index:200;
+    align-items:center; justify-content:center; padding:20px;
+  }
+  #confirm-modal.open{display:flex;}
+  .confirm-box{
+    background:var(--panel2); border:1px solid var(--border);
+    border-radius:12px; padding:22px; max-width:380px; width:100%;
+    box-shadow:0 12px 40px rgba(0,0,0,0.5);
+  }
+  .confirm-title{font-size:15px; font-weight:700; margin-bottom:8px;}
+  .confirm-msg{font-size:13px; color:var(--dim); line-height:1.5; margin-bottom:18px; font-family:var(--mono);}
+  .confirm-actions{display:flex; gap:10px; justify-content:flex-end;}
+  .confirm-actions button{
+    padding:8px 16px; border-radius:6px; font-size:13px; font-family:var(--mono);
+    cursor:pointer; border:1px solid var(--border); background:var(--accent-dim); color:#fff;
+  }
+  .confirm-actions button:hover{background:var(--accent);}
+  .confirm-actions button.secondary{background:none; color:var(--dim);}
+  .confirm-actions button.secondary:hover{color:var(--text); border-color:var(--dim); background:none;}
+
   /* ---------- Mobile ---------- */
   @media (max-width: 860px){
     #sidebar{
@@ -303,6 +329,9 @@
     #sidebar.open{transform:translateX(0);}
     #sb-overlay.open{display:block;}
     #sb-toggle{display:flex;}
+
+    #content{margin-left:0; width:100%;}
+    #download-bar{left:12px; right:12px; bottom:78px; max-width:none;}
 
     #topbar{padding:10px 12px;}
     #crumb{font-size:12px;}
@@ -350,6 +379,7 @@
 <div id="content">
   <div id="topbar">
     <div id="crumb">Loading…</div>
+    <button id="download-folder-btn" class="topbar-btn">Download folder (.zip)</button>
     <button id="select-toggle" class="topbar-btn">Select</button>
     <span id="status"></span>
   </div>
@@ -387,6 +417,17 @@
   </div>
 </div>
 
+<div id="confirm-modal">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirm-title">Confirm</div>
+    <div class="confirm-msg" id="confirm-msg"></div>
+    <div class="confirm-actions">
+      <button id="confirm-cancel" class="secondary">Cancel</button>
+      <button id="confirm-ok">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const OWNER = "myssal";
 const REPO = "Reverse-1999-CN-Asset";
@@ -421,6 +462,7 @@ const downloadBar = document.getElementById('download-bar');
 const selCountNum = document.getElementById('sel-count-num');
 const downloadSelectedBtn = document.getElementById('download-selected-btn');
 const clearSelectionBtn = document.getElementById('clear-selection-btn');
+const downloadFolderBtn = document.getElementById('download-folder-btn');
 
 const FOLDER_SVG = '<svg width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M2.5 5.5C2.5 4.67 3.17 4 4 4h4.5l1.8 2H16c.83 0 1.5.67 1.5 1.5v7c0 .83-.67 1.5-1.5 1.5H4c-.83 0-1.5-.67-1.5-1.5v-9Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>';
 
@@ -575,15 +617,8 @@ function makeSimpleRow(label, path, count, iconType){
   main.className = 'row-main';
 
   const icon = document.createElement('span');
-  if(iconType === 'star'){
-    icon.className = 'star-icon';
-    icon.textContent = '★';
-  } else if(iconType === 'all'){
-    icon.className = 'all-icon';
-  } else {
-    icon.className = 'folder-icon';
-    icon.innerHTML = FOLDER_SVG;
-  }
+  icon.className = 'folder-icon';
+  icon.innerHTML = FOLDER_SVG;
   main.appendChild(icon);
 
   const labelEl = document.createElement('span');
@@ -889,7 +924,7 @@ function closeLightbox(){
 }
 lbDownload.addEventListener('click', async () => {
   if(!currentLightboxImg) return;
-  const confirmed = confirm(`Download "${currentLightboxImg.name}"?`);
+  const confirmed = await showConfirm(`Download "${currentLightboxImg.name}"?`, 'Download file');
   if(!confirmed) return;
   lbDownload.disabled = true;
   const original = lbDownload.textContent;
@@ -955,56 +990,45 @@ async function downloadSingle(img){
   URL.revokeObjectURL(url);
 }
 
-downloadSelectedBtn.addEventListener('click', async () => {
-  const paths = [...selectedPaths];
-  if(paths.length === 0) return;
-
-  const confirmed = confirm(`Download ${paths.length} file${paths.length===1?'':'s'} as a single .zip?`);
-  if(!confirmed) return;
-
+async function buildAndDownloadZip(imgList, zipFilename, btn, disableAlso){
   if(typeof JSZip === 'undefined'){
     alert('Zip library failed to load — check your connection and try again.');
     return;
   }
 
-  downloadSelectedBtn.disabled = true;
-  clearSelectionBtn.disabled = true;
-  const originalText = downloadSelectedBtn.textContent;
+  btn.disabled = true;
+  if(disableAlso) disableAlso.forEach(b => b.disabled = true);
+  const originalText = btn.textContent;
   const zip = new JSZip();
-  const usedNames = new Map(); // avoid collisions when the same filename appears in different folders
-
   let failCount = 0;
 
-  for(let i = 0; i < paths.length; i++){
-    const img = allImages.find(x => x.path === paths[i]);
-    if(!img) continue;
-    downloadSelectedBtn.textContent = `Zipping ${i+1}/${paths.length}…`;
+  for(let i = 0; i < imgList.length; i++){
+    const img = imgList[i];
+    btn.textContent = `Zipping ${i+1}/${imgList.length}…`;
     try{
       const rawUrl = RAW_BASE + img.path.split('/').map(encodeURIComponent).join('/');
       const res = await fetch(rawUrl);
       if(!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
-
       // keep folder structure inside the zip so same-named files from different
       // characters/folders don't overwrite each other
-      const zipPath = img.path;
-      zip.file(zipPath, blob);
+      zip.file(img.path, blob);
     } catch(e){
       failCount++;
       console.error('Failed to fetch for zip:', img.path, e);
     }
   }
 
-  downloadSelectedBtn.textContent = 'Compressing…';
+  btn.textContent = 'Compressing…';
   try{
     const content = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } },
       (metadata) => {
-        downloadSelectedBtn.textContent = `Compressing… ${Math.round(metadata.percent)}%`;
+        btn.textContent = `Compressing… ${Math.round(metadata.percent)}%`;
       });
     const url = URL.createObjectURL(content);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `gally-export-${Date.now()}.zip`;
+    a.download = zipFilename;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -1018,10 +1042,61 @@ downloadSelectedBtn.addEventListener('click', async () => {
     alert(`${failCount} file(s) failed to download and were left out of the zip.`);
   }
 
-  downloadSelectedBtn.textContent = originalText;
-  downloadSelectedBtn.disabled = false;
-  clearSelectionBtn.disabled = false;
+  btn.textContent = originalText;
+  btn.disabled = false;
+  if(disableAlso) disableAlso.forEach(b => b.disabled = false);
+}
+
+downloadSelectedBtn.addEventListener('click', async () => {
+  const paths = [...selectedPaths];
+  if(paths.length === 0) return;
+
+  const confirmed = await showConfirm(`Download ${paths.length} file${paths.length===1?'':'s'} as a single .zip?`, 'Download as .zip');
+  if(!confirmed) return;
+
+  const imgList = paths.map(p => allImages.find(x => x.path === p)).filter(Boolean);
+  await buildAndDownloadZip(imgList, `gally-export-${Date.now()}.zip`, downloadSelectedBtn, [clearSelectionBtn]);
 });
+
+downloadFolderBtn.addEventListener('click', async () => {
+  const imgList = filtered.slice();
+  if(imgList.length === 0) return;
+
+  const folderLabel = selectedFolder || 'All';
+  const warnLarge = imgList.length > 250
+    ? `\n\nThis is a lot of files (${imgList.length}) — it may take a while and use significant memory in your browser.`
+    : '';
+  const confirmed = await showConfirm(
+    `Download all ${imgList.length} file${imgList.length===1?'':'s'} in "${folderLabel}" as a single .zip?${warnLarge}`,
+    'Download folder'
+  );
+  if(!confirmed) return;
+
+  const safeName = folderLabel.replace(/[^a-z0-9_-]+/gi, '_');
+  await buildAndDownloadZip(imgList, `gally-${safeName}-${Date.now()}.zip`, downloadFolderBtn, [selectToggle]);
+});
+
+// ---------- Custom confirm modal ----------
+const confirmModal = document.getElementById('confirm-modal');
+const confirmTitle = document.getElementById('confirm-title');
+const confirmMsg = document.getElementById('confirm-msg');
+const confirmOk = document.getElementById('confirm-ok');
+const confirmCancel = document.getElementById('confirm-cancel');
+let confirmResolver = null;
+
+function showConfirm(message, title){
+  confirmTitle.textContent = title || 'Confirm';
+  confirmMsg.textContent = message;
+  confirmModal.classList.add('open');
+  return new Promise(resolve => { confirmResolver = resolve; });
+}
+function resolveConfirm(val){
+  confirmModal.classList.remove('open');
+  if(confirmResolver){ confirmResolver(val); confirmResolver = null; }
+}
+confirmOk.addEventListener('click', () => resolveConfirm(true));
+confirmCancel.addEventListener('click', () => resolveConfirm(false));
+confirmModal.addEventListener('click', e => { if(e.target === confirmModal) resolveConfirm(false); });
 
 // Mobile sidebar toggle
 function openSidebarMobile(){ sidebar.classList.add('open'); sbOverlay.classList.add('open'); }
