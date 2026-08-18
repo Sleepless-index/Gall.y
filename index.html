@@ -89,11 +89,8 @@
     display:flex; align-items:center; gap:7px; flex:1; min-width:0; cursor:pointer;
     padding:1px 0;
   }
-  .folder-dot{
-    flex:0 0 auto; width:6px; height:6px; border-radius:50%;
-    background:var(--dim); opacity:0.6;
-  }
-  .trow.selected .folder-dot{background:var(--accent); opacity:1;}
+  .folder-icon{flex:0 0 auto; color:var(--dim); opacity:0.75; display:flex;}
+  .trow.selected .folder-icon{color:var(--accent); opacity:1;}
   .star-icon{flex:0 0 auto; color:var(--accent); font-size:12px;}
   .all-icon{flex:0 0 auto; width:6px; height:6px; border-radius:1px; background:var(--dim);}
 
@@ -146,6 +143,46 @@
   }
   #crumb b{color:var(--text); font-weight:600;}
   #status{font-size:12px; color:var(--dim); font-family:var(--mono); white-space:nowrap;}
+
+  .topbar-btn{
+    background:var(--panel2); border:1px solid var(--border); color:var(--text);
+    padding:7px 10px; border-radius:6px; font-size:12px; font-family:var(--mono);
+    cursor:pointer;
+  }
+  .topbar-btn:hover{border-color:var(--accent); color:var(--accent);}
+  .topbar-btn.active{background:var(--active); border-color:var(--accent); color:var(--accent);}
+
+  #download-bar{
+    display:none;
+    align-items:center; gap:10px;
+    background:var(--panel2); border:1px solid var(--accent-dim);
+    border-radius:8px; padding:10px 14px; margin-bottom:14px;
+    font-family:var(--mono); font-size:12.5px; flex-wrap:wrap;
+  }
+  #download-bar.active{display:flex;}
+  #download-bar .sel-count{color:var(--text); font-weight:600;}
+  #download-bar button{
+    background:var(--accent-dim); border:none; color:#fff;
+    padding:7px 14px; border-radius:6px; font-size:12px; font-family:var(--mono);
+    cursor:pointer;
+  }
+  #download-bar button:hover{background:var(--accent);}
+  #download-bar button.secondary{
+    background:none; border:1px solid var(--border); color:var(--dim);
+  }
+  #download-bar button.secondary:hover{color:var(--text); border-color:var(--dim);}
+
+  .cell{position:relative;}
+  .cell .select-check{
+    position:absolute; top:6px; left:6px; z-index:2;
+    width:20px; height:20px; border-radius:5px;
+    background:rgba(0,0,0,0.55); border:1.5px solid rgba(255,255,255,0.5);
+    display:none; align-items:center; justify-content:center;
+    color:#fff; font-size:12px;
+  }
+  body.select-mode .cell .select-check{display:flex;}
+  .cell.selected .select-check{background:var(--accent-dim); border-color:var(--accent);}
+  .cell.selected{border-color:var(--accent);}
 
   main{padding:18px 22px 60px; flex:1;}
 
@@ -292,6 +329,7 @@
 </style>
 </head>
 <body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <div id="sb-overlay"></div>
 
@@ -312,6 +350,7 @@
 <div id="content">
   <div id="topbar">
     <div id="crumb">Loading…</div>
+    <button id="select-toggle" class="topbar-btn">Select</button>
     <span id="status"></span>
   </div>
   <main>
@@ -319,6 +358,11 @@
     <div id="error-box">
       <div class="msg" id="error-msg">Failed to load file list.</div>
       <button id="retry-btn">Retry</button>
+    </div>
+    <div id="download-bar">
+      <span class="sel-count"><span id="sel-count-num">0</span> selected</span>
+      <button id="download-selected-btn">Download as .zip</button>
+      <button class="secondary" id="clear-selection-btn">Clear</button>
     </div>
     <div id="grid" class="grid"></div>
     <div id="empty" style="display:none;">No files match.</div>
@@ -332,9 +376,11 @@
   <div class="lb-meta" id="lb-path"></div>
   <div class="lb-info" id="lb-info">
     <span>size: <b id="lb-size">…</b></span>
+    <span>dimensions: <b id="lb-dims">…</b></span>
     <span>added/modified: <b id="lb-date">…</b></span>
   </div>
   <div class="lb-actions">
+    <button id="lb-download">Download</button>
     <a id="lb-open" href="#" target="_blank" rel="noopener">Open raw</a>
     <a id="lb-github" href="#" target="_blank" rel="noopener">View on GitHub</a>
     <button id="lb-copy">Copy path</button>
@@ -345,8 +391,8 @@
 const OWNER = "myssal";
 const REPO = "Reverse-1999-CN-Asset";
 const BRANCH = "master";
-const VIDEO_EXT = /\.(mp4|webm|mov)$/i;
-const MEDIA_EXT = /\.(png|jpe?g|webp|gif|mp4|webm|mov)$/i;
+const VIDEO_EXT = /\.(mp4|webm|mov|m4v|avi|mkv)$/i;
+const MEDIA_EXT = /\.(png|jpe?g|webp|gif|mp4|webm|mov|m4v|avi|mkv)$/i;
 const ALLOWED_PREFIXES = ['singlebg/', 'live2d/roles/', 'atlassrc/', 'singlebg_lang/', 'video/'];
 const PINNED_PATHS = ['singlebg/headicon_img', 'singlebg/headicon_middle'];
 
@@ -370,6 +416,13 @@ const sentinel = document.getElementById('sentinel');
 const sidebar = document.getElementById('sidebar');
 const sbToggle = document.getElementById('sb-toggle');
 const sbOverlay = document.getElementById('sb-overlay');
+const selectToggle = document.getElementById('select-toggle');
+const downloadBar = document.getElementById('download-bar');
+const selCountNum = document.getElementById('sel-count-num');
+const downloadSelectedBtn = document.getElementById('download-selected-btn');
+const clearSelectionBtn = document.getElementById('clear-selection-btn');
+
+const FOLDER_SVG = '<svg width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M2.5 5.5C2.5 4.67 3.17 4 4 4h4.5l1.8 2H16c.83 0 1.5.67 1.5 1.5v7c0 .83-.67 1.5-1.5 1.5H4c-.83 0-1.5-.67-1.5-1.5v-9Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>';
 
 let allImages = [];      // { path, name, folder, isVideo }
 let folderTree = {};     // nested { name, path, count, children:{} }
@@ -379,6 +432,10 @@ let filtered = [];
 let renderedCount = 0;
 const BATCH = 60;
 const openFolders = new Set(); // persists expand state across re-renders
+let selectMode = false;
+const selectedPaths = new Set();
+const dateCache = new Map(); // path -> ISO date string (or null if fetched-and-missing)
+let rootFolderNames = []; // diagnostics: actual top-level folder names seen in the tree
 
 async function init(){
   loadbar.classList.add('active');
@@ -398,6 +455,15 @@ async function init(){
     }
     const data = await res.json();
     const tree = data.tree || [];
+
+    // Diagnostics: every actual top-level folder name in the repo
+    const rootSet = new Set();
+    tree.forEach(item => {
+      const top = item.path.split('/')[0];
+      if(top && item.path.includes('/')) rootSet.add(top);
+    });
+    rootFolderNames = [...rootSet].sort();
+
     allImages = tree
       .filter(item => item.type === 'blob' && MEDIA_EXT.test(item.path))
       .filter(item => ALLOWED_PREFIXES.some(p => item.path.startsWith(p)))
@@ -407,6 +473,14 @@ async function init(){
         const folder = parts.slice(0, -1).join('/');
         return { path: item.path, name, folder, isVideo: VIDEO_EXT.test(item.path) };
       });
+
+    // Diagnostic: warn in console if a configured prefix matched nothing
+    ALLOWED_PREFIXES.forEach(p => {
+      const topName = p.split('/')[0];
+      if(!rootFolderNames.includes(topName)){
+        console.warn(`Gall.y: configured folder "${topName}" was not found at repo root. Actual root folders:`, rootFolderNames);
+      }
+    });
 
     buildFolderTree();
     renderTree();
@@ -501,8 +575,15 @@ function makeSimpleRow(label, path, count, iconType){
   main.className = 'row-main';
 
   const icon = document.createElement('span');
-  icon.className = iconType === 'star' ? 'star-icon' : 'all-icon';
-  if(iconType === 'star') icon.textContent = '★';
+  if(iconType === 'star'){
+    icon.className = 'star-icon';
+    icon.textContent = '★';
+  } else if(iconType === 'all'){
+    icon.className = 'all-icon';
+  } else {
+    icon.className = 'folder-icon';
+    icon.innerHTML = FOLDER_SVG;
+  }
   main.appendChild(icon);
 
   const labelEl = document.createElement('span');
@@ -550,9 +631,10 @@ function renderNode(node){
   const main = document.createElement('div');
   main.className = 'row-main';
 
-  const dot = document.createElement('span');
-  dot.className = 'folder-dot';
-  main.appendChild(dot);
+  const icon = document.createElement('span');
+  icon.className = 'folder-icon';
+  icon.innerHTML = FOLDER_SVG;
+  main.appendChild(icon);
 
   const labelEl = document.createElement('span');
   labelEl.className = 'label';
@@ -615,7 +697,18 @@ function applyFilters(){
   renderedCount = 0;
   const label = selectedFolder || 'All';
   crumbEl.innerHTML = `<b>${label}</b> — ${filtered.length.toLocaleString()} file${filtered.length===1?'':'s'}`;
-  emptyEl.style.display = filtered.length === 0 ? 'block' : 'none';
+
+  if(filtered.length === 0){
+    emptyEl.style.display = 'block';
+    if(allImages.length === 0 && rootFolderNames.length > 0){
+      emptyEl.innerHTML = `No matching folders found in the repo.<br><span style="font-family:var(--mono);font-size:11.5px;">Root folders present: ${rootFolderNames.join(', ')}</span>`;
+    } else {
+      emptyEl.textContent = 'No files match.';
+    }
+  } else {
+    emptyEl.style.display = 'none';
+  }
+
   renderNextBatch();
 }
 
@@ -626,7 +719,16 @@ function renderNextBatch(){
   const fragment = document.createDocumentFragment();
   slice.forEach(img => {
     const cell = document.createElement('div');
-    cell.className = 'cell';
+    cell.className = 'cell' + (selectedPaths.has(img.path) ? ' selected' : '');
+
+    const check = document.createElement('div');
+    check.className = 'select-check';
+    check.innerHTML = selectedPaths.has(img.path) ? '✓' : '';
+    check.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSelect(img.path, cell, check);
+    });
+    cell.appendChild(check);
 
     const wrap = document.createElement('div');
     wrap.className = 'thumb-wrap';
@@ -663,11 +765,35 @@ function renderNextBatch(){
     nameEl.textContent = img.name;
     cell.appendChild(nameEl);
 
-    cell.addEventListener('click', () => openLightbox(img));
+    cell.addEventListener('click', () => {
+      if(selectMode){
+        toggleSelect(img.path, cell, check);
+      } else {
+        openLightbox(img);
+      }
+    });
     fragment.appendChild(cell);
   });
   grid.appendChild(fragment);
   renderedCount += slice.length;
+}
+
+function toggleSelect(path, cell, check){
+  if(selectedPaths.has(path)){
+    selectedPaths.delete(path);
+    cell.classList.remove('selected');
+    check.innerHTML = '';
+  } else {
+    selectedPaths.add(path);
+    cell.classList.add('selected');
+    check.innerHTML = '✓';
+  }
+  updateDownloadBar();
+}
+
+function updateDownloadBar(){
+  selCountNum.textContent = selectedPaths.size;
+  downloadBar.classList.toggle('active', selectMode && selectedPaths.size > 0);
 }
 
 const observer = new IntersectionObserver(entries => {
@@ -684,6 +810,9 @@ const lbGithub = document.getElementById('lb-github');
 const lbCopy = document.getElementById('lb-copy');
 const lbSize = document.getElementById('lb-size');
 const lbDate = document.getElementById('lb-date');
+const lbDims = document.getElementById('lb-dims');
+const lbDownload = document.getElementById('lb-download');
+let currentLightboxImg = null;
 
 function formatBytes(bytes){
   if(bytes == null) return '—';
@@ -699,8 +828,10 @@ function formatDate(iso){
 }
 
 async function openLightbox(img){
+  currentLightboxImg = img;
   const rawUrl = RAW_BASE + img.path.split('/').map(encodeURIComponent).join('/');
   lbMedia.innerHTML = '';
+  lbDims.textContent = '…';
 
   if(img.isVideo){
     const vEl = document.createElement('video');
@@ -708,11 +839,17 @@ async function openLightbox(img){
     vEl.controls = true;
     vEl.autoplay = true;
     vEl.playsInline = true;
+    vEl.addEventListener('loadedmetadata', () => {
+      lbDims.textContent = `${vEl.videoWidth}×${vEl.videoHeight}`;
+    });
     lbMedia.appendChild(vEl);
   } else {
     const imEl = document.createElement('img');
     imEl.src = rawUrl;
     imEl.alt = img.name;
+    imEl.addEventListener('load', () => {
+      lbDims.textContent = `${imEl.naturalWidth}×${imEl.naturalHeight}`;
+    });
     lbMedia.appendChild(imEl);
   }
 
@@ -720,7 +857,7 @@ async function openLightbox(img){
   lbOpen.href = rawUrl;
   lbGithub.href = BLOB_BASE + img.path.split('/').map(encodeURIComponent).join('/');
   lbSize.textContent = '…';
-  lbDate.textContent = '…';
+  lbDate.textContent = dateCache.has(img.path) && dateCache.get(img.path) ? formatDate(dateCache.get(img.path)) : '…';
   lightbox.classList.add('open');
   document.body.classList.add('modal-open');
 
@@ -729,16 +866,20 @@ async function openLightbox(img){
     .then(data => { lbSize.textContent = data && data.size != null ? formatBytes(data.size) : 'unavailable'; })
     .catch(() => { lbSize.textContent = 'unavailable'; });
 
-  fetch(COMMITS_API(img.path))
-    .then(r => r.ok ? r.json() : null)
-    .then(data => {
-      if(data && data[0] && data[0].commit && data[0].commit.committer){
-        lbDate.textContent = formatDate(data[0].commit.committer.date);
-      } else {
-        lbDate.textContent = 'unavailable';
-      }
-    })
-    .catch(() => { lbDate.textContent = 'unavailable'; });
+  if(!dateCache.has(img.path)){
+    fetch(COMMITS_API(img.path))
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        const date = (data && data[0] && data[0].commit && data[0].commit.committer)
+          ? data[0].commit.committer.date : null;
+        dateCache.set(img.path, date);
+        lbDate.textContent = date ? formatDate(date) : 'unavailable';
+      })
+      .catch(() => { lbDate.textContent = 'unavailable'; });
+  } else {
+    const cached = dateCache.get(img.path);
+    lbDate.textContent = cached ? formatDate(cached) : 'unavailable';
+  }
 }
 
 function closeLightbox(){
@@ -746,6 +887,22 @@ function closeLightbox(){
   document.body.classList.remove('modal-open');
   lbMedia.innerHTML = '';
 }
+lbDownload.addEventListener('click', async () => {
+  if(!currentLightboxImg) return;
+  const confirmed = confirm(`Download "${currentLightboxImg.name}"?`);
+  if(!confirmed) return;
+  lbDownload.disabled = true;
+  const original = lbDownload.textContent;
+  lbDownload.textContent = 'Downloading…';
+  try{
+    await downloadSingle(currentLightboxImg);
+  } catch(e){
+    console.error(e);
+  }
+  lbDownload.textContent = original;
+  lbDownload.disabled = false;
+});
+
 document.getElementById('lb-close').addEventListener('click', closeLightbox);
 lightbox.addEventListener('click', e => { if(e.target === lightbox) closeLightbox(); });
 document.addEventListener('keydown', e => { if(e.key === 'Escape') closeLightbox(); });
@@ -763,6 +920,107 @@ sbSearch.addEventListener('input', () => {
     searchQuery = sbSearch.value;
     applyFilters();
   }, 200);
+});
+
+// ---------- Select mode ----------
+selectToggle.addEventListener('click', () => {
+  selectMode = !selectMode;
+  document.body.classList.toggle('select-mode', selectMode);
+  selectToggle.classList.toggle('active', selectMode);
+  selectToggle.textContent = selectMode ? 'Cancel select' : 'Select';
+  if(!selectMode){
+    selectedPaths.clear();
+  }
+  updateDownloadBar();
+  applyFilters();
+});
+
+clearSelectionBtn.addEventListener('click', () => {
+  selectedPaths.clear();
+  updateDownloadBar();
+  applyFilters();
+});
+
+async function downloadSingle(img){
+  const rawUrl = RAW_BASE + img.path.split('/').map(encodeURIComponent).join('/');
+  const res = await fetch(rawUrl);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = img.name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+downloadSelectedBtn.addEventListener('click', async () => {
+  const paths = [...selectedPaths];
+  if(paths.length === 0) return;
+
+  const confirmed = confirm(`Download ${paths.length} file${paths.length===1?'':'s'} as a single .zip?`);
+  if(!confirmed) return;
+
+  if(typeof JSZip === 'undefined'){
+    alert('Zip library failed to load — check your connection and try again.');
+    return;
+  }
+
+  downloadSelectedBtn.disabled = true;
+  clearSelectionBtn.disabled = true;
+  const originalText = downloadSelectedBtn.textContent;
+  const zip = new JSZip();
+  const usedNames = new Map(); // avoid collisions when the same filename appears in different folders
+
+  let failCount = 0;
+
+  for(let i = 0; i < paths.length; i++){
+    const img = allImages.find(x => x.path === paths[i]);
+    if(!img) continue;
+    downloadSelectedBtn.textContent = `Zipping ${i+1}/${paths.length}…`;
+    try{
+      const rawUrl = RAW_BASE + img.path.split('/').map(encodeURIComponent).join('/');
+      const res = await fetch(rawUrl);
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+
+      // keep folder structure inside the zip so same-named files from different
+      // characters/folders don't overwrite each other
+      const zipPath = img.path;
+      zip.file(zipPath, blob);
+    } catch(e){
+      failCount++;
+      console.error('Failed to fetch for zip:', img.path, e);
+    }
+  }
+
+  downloadSelectedBtn.textContent = 'Compressing…';
+  try{
+    const content = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } },
+      (metadata) => {
+        downloadSelectedBtn.textContent = `Compressing… ${Math.round(metadata.percent)}%`;
+      });
+    const url = URL.createObjectURL(content);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `gally-export-${Date.now()}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch(e){
+    console.error(e);
+    alert('Failed to build the zip file.');
+  }
+
+  if(failCount > 0){
+    alert(`${failCount} file(s) failed to download and were left out of the zip.`);
+  }
+
+  downloadSelectedBtn.textContent = originalText;
+  downloadSelectedBtn.disabled = false;
+  clearSelectionBtn.disabled = false;
 });
 
 // Mobile sidebar toggle
