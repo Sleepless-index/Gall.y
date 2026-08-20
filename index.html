@@ -136,7 +136,7 @@
     background: var(--panel2); color: var(--text); border: 1px solid var(--border);
     width: 50px; height: 50px; border-radius: 50%;
     font-size: 22px; cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4); 
+     
     align-items: center; justify-content: center; transition: background 0.15s ease, border-color 0.15s ease;
   }
   #sb-toggle:hover { border-color: var(--accent); color: var(--accent); }
@@ -168,7 +168,7 @@
   .topbar-btn {
     background: var(--panel2); border: 1px solid var(--border); color: var(--text);
     padding: 8px 14px; border-radius: 8px; font-size: 13px; font-family: var(--sans); font-weight: 500;
-    cursor: pointer; transition: all 0.2s ease; box-shadow: none;
+    cursor: pointer; transition: all 0.2s ease; 
   }
   .topbar-btn:hover { border-color: var(--accent); color: var(--accent); }
   .topbar-btn.active { background: var(--active); border-color: var(--accent); color: var(--accent); }
@@ -356,9 +356,7 @@
   /* ---------- Live2D Player / Premium Viewer ---------- */
   #l2d-player {
     position: fixed; inset: 0; z-index: 100; display: none;
-    background:
-      radial-gradient(circle at 50% 42%, rgba(129,140,248,0.08), transparent 38%),
-      #07070b;
+    background: #07070b;
     animation: l2dFadeIn 0.22s ease;
     overflow: hidden;
   }
@@ -423,18 +421,17 @@
   #l2d-stage {
     position: absolute; inset: 0; cursor: grab; touch-action: none; overflow: hidden;
     background:
-      radial-gradient(circle at 50% 44%, rgba(255,255,255,.025), transparent 34%),
       linear-gradient(45deg, #14141d 25%, transparent 25%),
       linear-gradient(-45deg, #14141d 25%, transparent 25%),
       linear-gradient(45deg, transparent 75%, #14141d 75%),
       linear-gradient(-45deg, transparent 75%, #14141d 75%);
-    background-size: auto, 24px 24px, 24px 24px, 24px 24px, 24px 24px;
-    background-position: center, 0 0, 0 12px, 12px -12px, -12px 0;
+    background-size: 24px 24px, 24px 24px, 24px 24px, 24px 24px;
+    background-position: 0 0, 0 12px, 12px -12px, -12px 0;
     background-color: #0e0e15;
   }
   #l2d-stage::after {
     content: ''; position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(circle, transparent 45%, rgba(0,0,0,.24) 100%);
+    background: rgba(0,0,0,.16);
   }
   #l2d-stage.panning { cursor: grabbing; }
   #l2d-canvas { width: 100%; height: 100%; display: block; position: relative; z-index: 1; }
@@ -547,7 +544,7 @@
   }
   .l2d-anim-btn .l2d-anim-raw { display:block; font:9px var(--mono); color:var(--dim); margin-top:2px; }
   .l2d-anim-btn:hover { border-color:rgba(129,140,248,.45); color:#fff; background:rgba(129,140,248,.08); }
-  .l2d-anim-btn.active { background:linear-gradient(180deg, rgba(129,140,248,.28), rgba(79,70,229,.24)); border-color:rgba(129,140,248,.55); color:#fff; box-shadow:0 4px 16px rgba(79,70,229,.12); }
+  .l2d-anim-btn.active { background: rgba(129,140,248,.26); border-color:rgba(129,140,248,.55); color:#fff; box-shadow:0 4px 16px rgba(79,70,229,.12); }
   .l2d-anim-btn.active .l2d-anim-raw { color:rgba(255,255,255,.68); }
 
   .l2d-dev-info { margin-top:14px; border-top:1px solid rgba(255,255,255,.07); padding-top:12px; }
@@ -611,7 +608,7 @@
     #sidebar {
       position: fixed; left: 0; top: 0; z-index: 40;
       transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      width: 85vw; max-width: 340px; box-shadow: 12px 0 32px rgba(0,0,0,0.6);
+      width: 85vw; max-width: 340px; 
     }
     #sidebar.open { transform: translateX(0); }
     #sb-overlay.open { display: block; }
@@ -660,28 +657,22 @@
      GALL.Y — SIDEBAR + MEDIA LIGHTBOX POLISH
      ================================================================ */
   #sidebar {
-    background:
-      linear-gradient(180deg, rgba(25,25,36,.98), rgba(14,14,20,.99));
+    background: rgba(19,19,28,.98);
     border-right-color: rgba(255,255,255,.075);
-    box-shadow: 18px 0 50px rgba(0,0,0,.12);
   }
   #sidebar::after {
     content:''; position:absolute; top:0; right:-1px; width:1px; height:100%;
-    background:linear-gradient(180deg, transparent, rgba(129,140,248,.25), transparent);
+    background: rgba(129,140,248,.18);
     pointer-events:none;
   }
   .sb-header {
     padding:18px 16px 16px;
-    background:linear-gradient(180deg, rgba(255,255,255,.025), transparent);
+    background: transparent;
     border-bottom-color:rgba(255,255,255,.065);
   }
   .sb-header-top { margin-bottom:14px; }
   .sb-title {
     font-size:19px; letter-spacing:-.02em; display:flex; align-items:center; gap:2px;
-  }
-  .sb-title::before {
-    content:''; width:7px; height:7px; border-radius:50%; background:var(--accent);
-    box-shadow:0 0 12px rgba(129,140,248,.65); margin-right:5px;
   }
   #download-folder-btn {
     padding:7px 9px; border-radius:9px; background:rgba(255,255,255,.045);
@@ -692,9 +683,9 @@
   #sb-search {
     height:40px; padding:0 12px 0 39px; border-radius:11px;
     background:rgba(7,7,11,.55); border-color:rgba(255,255,255,.08);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+    
   }
-  #sb-search:focus { border-color:rgba(129,140,248,.55); box-shadow:0 0 0 3px rgba(129,140,248,.09); }
+  #sb-search:focus { border-color:rgba(129,140,248,.55);  }
   .sb-header { position:relative; }
   .sb-header::after {
     content:'⌕'; position:absolute; left:29px; bottom:26px; color:var(--dim); font-size:18px;
@@ -709,7 +700,7 @@
   }
   .trow:hover { background:rgba(255,255,255,.045); border-color:rgba(255,255,255,.045); }
   .trow.selected {
-    background:linear-gradient(90deg, rgba(129,140,248,.16), rgba(129,140,248,.055));
+    background: rgba(129,140,248,.12);
     border-color:rgba(129,140,248,.18); color:#d9d9ff;
     box-shadow:inset 3px 0 0 var(--accent);
   }
@@ -747,7 +738,7 @@
   }
   #lightbox::before {
     content:''; position:absolute; inset:0; pointer-events:none;
-    background:radial-gradient(circle at 50% 38%, rgba(129,140,248,.09), transparent 43%);
+    background: rgba(129,140,248,.05);
   }
   #lightbox.open #lb-media { animation:lbMediaIn .24s cubic-bezier(.16,1,.3,1); }
   @keyframes lbMediaIn { from { opacity:0; transform:scale(.975) translateY(8px); } to { opacity:1; transform:none; } }
@@ -803,7 +794,7 @@
   #lb-close:hover { background:rgba(239,68,68,.14); border-color:rgba(239,68,68,.25); }
 
   @media (max-width:860px) {
-    #sidebar { width:min(88vw,350px); box-shadow:20px 0 55px rgba(0,0,0,.65); }
+    #sidebar { width:min(88vw,350px);  }
     .sb-header { padding-top:calc(16px + env(safe-area-inset-top,0px)); }
     #lightbox { padding:18px 12px; justify-content:center; }
     #lb-media { width:calc(100vw - 24px); max-height:calc(100vh - 230px); padding:6px; border-radius:15px; }
@@ -841,7 +832,8 @@
   <div id="tree"></div>
   <div class="sb-footer">
     Source: <a href="https://github.com/myssal/Reverse-1999-CN-Asset" target="_blank" rel="noopener">myssal/Reverse-1999-CN-Asset</a><br>
-    Files served live, not hosted here.
+    Files served live, not hosted here.<br>
+    <span id="tree-status">Updated just now</span> · <a href="#" id="tree-refresh-link">Refresh</a>
   </div>
 </aside>
 
@@ -887,7 +879,6 @@
     <div class="lb-info" id="lb-info">
       <span>Size: <b id="lb-size">…</b></span>
       <span>Dimensions: <b id="lb-dims">…</b></span>
-      <span>Added/Modified: <b id="lb-date">…</b></span>
     </div>
     <div class="lb-actions">
       <button id="lb-download" class="lb-icon-btn" title="Download Media">
@@ -1025,8 +1016,37 @@ const PINNED_FOLDER_PATHS = PINNED_PATHS.map(p => p.path);
 const RAW_BASE = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/`;
 const BLOB_BASE = `https://github.com/${OWNER}/${REPO}/blob/${BRANCH}/`;
 const TREE_API = `https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`;
-const COMMITS_API = (path) => `https://api.github.com/repos/${OWNER}/${REPO}/commits?path=${encodeURIComponent(path)}&per_page=1`;
-const CONTENTS_API = (path) => `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${BRANCH}`;
+
+// ---------- Tree cache ----------
+// The recursive tree call is the single most expensive GitHub API request
+// this app makes. We cache its result in localStorage and only re-fetch
+// when the user explicitly asks (or there's no cache yet), instead of
+// hitting the API fresh on every page load.
+const TREE_CACHE_KEY = `gally-tree-cache:${OWNER}/${REPO}/${BRANCH}`;
+function loadCachedTree(){
+  try{
+    const raw = localStorage.getItem(TREE_CACHE_KEY);
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    if(!parsed || !Array.isArray(parsed.tree) || !parsed.savedAt) return null;
+    return parsed;
+  } catch(e){ return null; }
+}
+function saveCachedTree(tree){
+  try{
+    localStorage.setItem(TREE_CACHE_KEY, JSON.stringify({ tree, savedAt: Date.now() }));
+  } catch(e){ /* storage full or unavailable — just skip caching */ }
+}
+function formatRelativeTime(ms){
+  const s = Math.round((Date.now() - ms) / 1000);
+  if(s < 60) return 'just now';
+  const m = Math.round(s / 60);
+  if(m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if(h < 24) return `${h} hr ago`;
+  const d = Math.round(h / 24);
+  return `${d} day${d===1?'':'s'} ago`;
+}
 
 const grid = document.getElementById('grid');
 const crumbEl = document.getElementById('crumb');
@@ -1062,7 +1082,6 @@ const BATCH = 60;
 const openFolders = new Set();
 let selectMode = false;
 const selectedPaths = new Set();
-const dateCache = new Map();
 let rootFolderNames = [];
 
 // ---------- Live2D / Spine models ----------
@@ -1106,18 +1125,38 @@ function showLoadingState(){
   crumbEl.innerHTML = '<b>Loading</b>';
 }
 
-async function init(){
+let lastTreeSavedAt = null;
+
+function updateTreeStatusUI(){
+  const statusEl = document.getElementById('tree-status');
+  if(statusEl) statusEl.textContent = lastTreeSavedAt
+    ? `Updated ${formatRelativeTime(lastTreeSavedAt)}`
+    : 'Not loaded yet';
+}
+
+async function init(forceRefresh){
   showLoadingState();
   try{
-    const res = await fetch(TREE_API);
-    if(!res.ok){
-      showError("Failed to Load Repository", res.status === 403
-        ? "Rate limited by GitHub API. Please try again in a bit."
-        : `Server returned HTTP ${res.status}.`);
-      return;
+    let tree;
+    const cached = !forceRefresh ? loadCachedTree() : null;
+
+    if(cached){
+      tree = cached.tree;
+      lastTreeSavedAt = cached.savedAt;
+    } else {
+      const res = await fetch(TREE_API);
+      if(!res.ok){
+        showError("Failed to Load Repository", res.status === 403
+          ? "Rate limited by GitHub API. Please try again in a bit."
+          : `Server returned HTTP ${res.status}.`);
+        return;
+      }
+      const data = await res.json();
+      tree = data.tree || [];
+      saveCachedTree(tree);
+      lastTreeSavedAt = Date.now();
     }
-    const data = await res.json();
-    const tree = data.tree || [];
+    updateTreeStatusUI();
 
     const rootSet = new Set();
     tree.forEach(item => {
@@ -1133,7 +1172,7 @@ async function init(){
         const parts = item.path.split('/');
         const name = parts[parts.length - 1];
         const folder = parts.slice(0, -1).join('/');
-        return { path: item.path, name, folder };
+        return { path: item.path, name, folder, size: typeof item.size === 'number' ? item.size : null };
       });
 
     discoverLive2DModels(tree);
@@ -1159,7 +1198,15 @@ function showError(title, msg){
   stateSub.textContent = msg;
   crumbEl.innerHTML = '<b>Failed</b>';
 }
-retryBtn.addEventListener('click', init);
+retryBtn.addEventListener('click', () => init(false));
+
+const treeRefreshLink = document.getElementById('tree-refresh-link');
+if(treeRefreshLink){
+  treeRefreshLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    init(true);
+  });
+}
 
 function discoverLive2DModels(tree){
   SPINE_SOURCES.forEach(source => {
@@ -1773,7 +1820,6 @@ const lbMedia = document.getElementById('lb-media');
 const lbPath = document.getElementById('lb-path');
 const lbGithub = document.getElementById('lb-github');
 const lbSize = document.getElementById('lb-size');
-const lbDate = document.getElementById('lb-date');
 const lbDims = document.getElementById('lb-dims');
 const lbDownload = document.getElementById('lb-download');
 
@@ -1784,12 +1830,6 @@ function formatBytes(bytes){
   if(bytes < 1024) return bytes + ' B';
   if(bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
   return (bytes/(1024*1024)).toFixed(2) + ' MB';
-}
-
-function formatDate(iso){
-  if(!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
 }
 
 // ---------- Live2D / Spine player ----------
@@ -2687,30 +2727,11 @@ async function openLightbox(img){
 
   lbPath.textContent = img.path;
   lbGithub.href = BLOB_BASE + img.path.split('/').map(encodeURIComponent).join('/');
-  lbSize.textContent = '…';
-  lbDate.textContent = dateCache.has(img.path) && dateCache.get(img.path) ? formatDate(dateCache.get(img.path)) : '…';
+  // File size comes from the cached repo tree (git/trees returns blob sizes
+  // directly) — no separate API call needed.
+  lbSize.textContent = img.size != null ? formatBytes(img.size) : 'unavailable';
   lightbox.classList.add('open');
   document.body.classList.add('modal-open');
-
-  fetch(CONTENTS_API(img.path))
-    .then(r => r.ok ? r.json() : null)
-    .then(data => { lbSize.textContent = data && data.size != null ? formatBytes(data.size) : 'unavailable'; })
-    .catch(() => { lbSize.textContent = 'unavailable'; });
-
-  if(!dateCache.has(img.path)){
-    fetch(COMMITS_API(img.path))
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        const date = (data && data[0] && data[0].commit && data[0].commit.committer)
-          ? data[0].commit.committer.date : null;
-        dateCache.set(img.path, date);
-        lbDate.textContent = date ? formatDate(date) : 'unavailable';
-      })
-      .catch(() => { lbDate.textContent = 'unavailable'; });
-  } else {
-    const cached = dateCache.get(img.path);
-    lbDate.textContent = cached ? formatDate(cached) : 'unavailable';
-  }
 }
 
 function closeLightbox(){
@@ -2896,7 +2917,7 @@ sbToggle.addEventListener('click', () => {
 });
 sbOverlay.addEventListener('click', closeSidebarMobile);
 
-init();
+init(false);
 </script>
 </body>
 </html>
