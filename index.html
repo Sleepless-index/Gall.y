@@ -290,7 +290,12 @@
     position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.7);
     color: #fff; font-size: 11px; padding: 4px 8px; border-radius: 6px; font-weight: 600;
     pointer-events: none; backdrop-filter: blur(4px);
+    display: flex; align-items: center; gap: 4px;
   }
+  .thumb-wrap .play-badge svg { flex-shrink: 0; }
+
+  .live2d-cell .thumb-wrap { background-color: #17131f; }
+  .live2d-cell:hover { border-color: var(--accent); }
 
   .cell .name {
     font-size: 12px; font-family: var(--sans); color: var(--text); opacity: 0.9;
@@ -347,6 +352,237 @@
     transition: all 0.2s ease; backdrop-filter: blur(4px); box-shadow: none;
   }
   #lb-close:hover { background: rgba(255,255,255,0.1); transform: scale(1.05); }
+
+  /* ---------- Live2D Player / Premium Viewer ---------- */
+  #l2d-player {
+    position: fixed; inset: 0; z-index: 100; display: none;
+    background:
+      radial-gradient(circle at 50% 42%, rgba(129,140,248,0.08), transparent 38%),
+      #07070b;
+    animation: l2dFadeIn 0.22s ease;
+    overflow: hidden;
+  }
+  #l2d-player.open { display: block; }
+  @keyframes l2dFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  /* The viewer deliberately uses a small HUD instead of scattering controls
+     across the canvas. This keeps the character unobstructed while still
+     making the important actions obvious. */
+  .l2d-topbar {
+    position: fixed; top: 16px; left: 16px; right: 16px; z-index: 112;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    pointer-events: none;
+  }
+  .l2d-model-heading,
+  .l2d-top-actions {
+    pointer-events: auto;
+    background: rgba(16,16,24,0.72);
+    border: 1px solid rgba(255,255,255,0.09);
+    box-shadow: 0 12px 36px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.035);
+    backdrop-filter: blur(18px) saturate(145%);
+    -webkit-backdrop-filter: blur(18px) saturate(145%);
+  }
+  .l2d-model-heading {
+    min-width: 0; max-width: min(520px, 62vw);
+    padding: 10px 14px; border-radius: 14px;
+  }
+  .l2d-kicker {
+    color: var(--accent); font-size: 9px; font-weight: 800;
+    letter-spacing: .14em; text-transform: uppercase; margin-bottom: 3px;
+  }
+  .l2d-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  #l2d-model-name {
+    font-size: 14px; line-height: 1.25; font-weight: 700; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .l2d-live-pill {
+    flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 7px; border-radius: 999px;
+    background: rgba(129,140,248,0.11); border: 1px solid rgba(129,140,248,0.22);
+    color: #c7c9ff; font-size: 9px; font-weight: 700;
+  }
+  .l2d-live-pill::before {
+    content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
+    box-shadow: 0 0 9px rgba(129,140,248,.8); animation: l2dPulse 1.8s ease-in-out infinite;
+  }
+  @keyframes l2dPulse { 50% { opacity: .35; transform: scale(.75); } }
+
+  .l2d-top-actions {
+    display: flex; align-items: center; gap: 6px; padding: 5px; border-radius: 14px;
+  }
+  .l2d-top-btn {
+    width: 38px; height: 38px; border-radius: 10px; border: 1px solid transparent;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; color: rgba(255,255,255,.82); cursor: pointer;
+    transition: background .16s ease, color .16s ease, border-color .16s ease, transform .16s ease;
+  }
+  .l2d-top-btn:hover { background: rgba(255,255,255,.08); color: #fff; border-color: rgba(255,255,255,.1); transform: translateY(-1px); }
+  .l2d-top-btn.active { background: rgba(129,140,248,.18); color: #fff; border-color: rgba(129,140,248,.35); }
+  .l2d-top-btn.close:hover { background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.25); color: #fecaca; }
+
+  #l2d-stage {
+    position: absolute; inset: 0; cursor: grab; touch-action: none; overflow: hidden;
+    background:
+      radial-gradient(circle at 50% 44%, rgba(255,255,255,.025), transparent 34%),
+      linear-gradient(45deg, #14141d 25%, transparent 25%),
+      linear-gradient(-45deg, #14141d 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #14141d 75%),
+      linear-gradient(-45deg, transparent 75%, #14141d 75%);
+    background-size: auto, 24px 24px, 24px 24px, 24px 24px, 24px 24px;
+    background-position: center, 0 0, 0 12px, 12px -12px, -12px 0;
+    background-color: #0e0e15;
+  }
+  #l2d-stage::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(circle, transparent 45%, rgba(0,0,0,.24) 100%);
+  }
+  #l2d-stage.panning { cursor: grabbing; }
+  #l2d-canvas { width: 100%; height: 100%; display: block; position: relative; z-index: 1; }
+
+  #l2d-status {
+    position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 10px; color: var(--dim); font-size: 13px; text-align: center;
+    padding: 24px; background: rgba(7,7,11,.58); backdrop-filter: blur(3px); pointer-events: none;
+  }
+  #l2d-status.hidden { display: none; }
+  #l2d-status .spinner {
+    width: 30px; height: 30px; border: 3px solid rgba(255,255,255,.1);
+    border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite;
+  }
+  #l2d-debug-overlay {
+    position: absolute; top: 84px; left: 18px; right: 18px; z-index: 6;
+    max-height: 25%; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+    font-family: var(--mono); font-size: 10px; line-height: 1.5; color: #ff8585;
+    background: rgba(0,0,0,.66); border: 1px solid rgba(255,255,255,.08);
+    padding: 7px 10px; border-radius: 10px; pointer-events: none;
+  }
+  #l2d-debug-overlay:empty { display: none; }
+
+  .l2d-stage-hint {
+    position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 7;
+    padding: 7px 11px; border-radius: 999px; pointer-events: none;
+    color: rgba(255,255,255,.55); background: rgba(8,8,12,.45);
+    border: 1px solid rgba(255,255,255,.06); backdrop-filter: blur(10px);
+    font-size: 10px; letter-spacing: .02em; transition: opacity .3s ease;
+  }
+
+  /* Playback controls: compact, readable, and visually separate from model selection. */
+  #l2d-transport-toggle {
+    position: static; z-index: auto;
+  }
+  #l2d-transport-panel {
+    position: fixed; top: 76px; left: 16px; z-index: 111;
+    width: min(520px, calc(100vw - 32px));
+    padding: 12px 13px; border-radius: 15px;
+    background: rgba(17,17,25,.78); border: 1px solid rgba(255,255,255,.09);
+    box-shadow: 0 16px 44px rgba(0,0,0,.4);
+    backdrop-filter: blur(20px) saturate(150%); -webkit-backdrop-filter: blur(20px) saturate(150%);
+    opacity: 0; transform: translateY(-7px) scale(.985); pointer-events: none;
+    transition: opacity .18s ease, transform .18s cubic-bezier(.16,1,.3,1);
+  }
+  #l2d-transport-panel.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+  .l2d-transport-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
+  .l2d-transport-label { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.09em; color:var(--dim); }
+  .l2d-transport-shortcut { font: 10px var(--mono); color: rgba(255,255,255,.36); }
+  #l2d-transport-panel .l2d-transport { padding:0; display:flex; align-items:center; gap:9px; }
+  .l2d-ctrl-btn {
+    background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.09); color: var(--text);
+    width: 36px; height: 36px; border-radius: 10px; cursor: pointer; flex:0 0 auto;
+    display:inline-flex; align-items:center; justify-content:center; transition:all .15s ease;
+  }
+  .l2d-ctrl-btn:hover { border-color:rgba(129,140,248,.45); color:#fff; background:rgba(129,140,248,.1); }
+  .l2d-ctrl-btn.active { background:var(--accent-dim); border-color:var(--accent-dim); color:#fff; }
+  #l2d-scrubber {
+    flex:1; min-width:80px; -webkit-appearance:none; appearance:none; height:4px;
+    border-radius:999px; background:rgba(255,255,255,.12); outline:none; cursor:pointer;
+  }
+  #l2d-scrubber::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #11111a; box-shadow:0 0 0 3px rgba(129,140,248,.12); }
+  #l2d-scrubber::-moz-range-thumb { width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; border:2px solid #11111a; }
+  #l2d-scrubber:disabled { opacity:.3; cursor:default; }
+  .l2d-speed-group { display:flex; gap:2px; flex:0 0 auto; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:3px; }
+  .l2d-speed-btn { background:none; border:none; color:var(--dim); font:700 10px var(--mono); padding:5px 7px; border-radius:7px; cursor:pointer; transition:all .15s ease; }
+  .l2d-speed-btn.active { background:var(--accent-dim); color:#fff; }
+  .l2d-speed-btn:hover:not(.active) { color:var(--text); }
+
+  /* Floating bottom sheet: collapsed = a slim grab tab, expanded = the control center. */
+  #l2d-drawer {
+    position: fixed; left:18px; right:18px; bottom:18px; z-index:108;
+    width:auto; max-width:1180px; margin:0 auto; max-height:min(54vh, 560px);
+    background:rgba(17,17,25,.82); border:1px solid rgba(255,255,255,.09);
+    border-radius:20px; box-shadow:0 -2px 0 rgba(255,255,255,.02), 0 22px 70px rgba(0,0,0,.48);
+    backdrop-filter:blur(24px) saturate(150%); -webkit-backdrop-filter:blur(24px) saturate(150%);
+    transform:translateY(calc(100% - 54px)); transition:transform .3s cubic-bezier(.16,1,.3,1);
+    display:flex; flex-direction:column; overflow:hidden; padding-bottom:env(safe-area-inset-bottom,0);
+  }
+  #l2d-drawer.open { transform:translateY(0); }
+  #l2d-drawer-handle {
+    position:relative; flex:0 0 54px; display:flex; align-items:center; justify-content:space-between;
+    padding:0 18px; cursor:pointer; user-select:none; color:var(--dim); border-bottom:1px solid transparent;
+  }
+  #l2d-drawer.open #l2d-drawer-handle { border-bottom-color:rgba(255,255,255,.07); }
+  #l2d-drawer-handle::before { content:''; position:absolute; top:8px; left:50%; transform:translateX(-50%); width:34px; height:3px; border-radius:999px; background:rgba(255,255,255,.18); }
+  .l2d-drawer-handle-left { display:flex; align-items:center; gap:9px; min-width:0; padding-top:4px; }
+  .l2d-drawer-icon { width:28px; height:28px; border-radius:9px; display:grid; place-items:center; color:var(--accent); background:rgba(129,140,248,.1); border:1px solid rgba(129,140,248,.14); }
+  #l2d-drawer-title { font-size:12px; font-weight:750; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .l2d-drawer-state { font-size:10px; color:var(--dim); margin-top:2px; }
+  #l2d-drawer-handle > svg { transition:transform .25s ease; margin-top:8px; flex:0 0 auto; }
+  #l2d-drawer.open #l2d-drawer-handle > svg { transform:rotate(180deg); }
+  #l2d-drawer-body { overflow-y:auto; padding:14px 18px 18px; scrollbar-width:thin; }
+
+  .l2d-now-playing-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 0 14px; }
+  .l2d-now-playing { font-size:13px; color:var(--text); font-weight:700; min-width:0; }
+  .l2d-now-playing span { display:block; color:var(--dim); font-size:9px; text-transform:uppercase; letter-spacing:.09em; font-weight:800; margin-bottom:3px; }
+  #l2d-now-playing-name { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .l2d-variant-group { margin-bottom:14px; }
+  .l2d-variant-group:empty { display:none; }
+  .l2d-anim-group { margin-bottom:14px; padding:11px; border-radius:13px; background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.055); }
+  .l2d-anim-group:last-child { margin-bottom:0; }
+  .l2d-anim-group-label { font-size:9px; text-transform:uppercase; letter-spacing:.1em; color:var(--dim); padding:0 2px 8px; font-weight:800; }
+  .l2d-anim-row { display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-start; }
+  .l2d-anim-btn {
+    background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.08); color:var(--text);
+    padding:7px 10px; min-height:34px; border-radius:9px; font-size:11px; font-family:var(--sans); font-weight:600;
+    cursor:pointer; transition:all .15s ease; text-align:left;
+  }
+  .l2d-anim-btn .l2d-anim-raw { display:block; font:9px var(--mono); color:var(--dim); margin-top:2px; }
+  .l2d-anim-btn:hover { border-color:rgba(129,140,248,.45); color:#fff; background:rgba(129,140,248,.08); }
+  .l2d-anim-btn.active { background:linear-gradient(180deg, rgba(129,140,248,.28), rgba(79,70,229,.24)); border-color:rgba(129,140,248,.55); color:#fff; box-shadow:0 4px 16px rgba(79,70,229,.12); }
+  .l2d-anim-btn.active .l2d-anim-raw { color:rgba(255,255,255,.68); }
+
+  .l2d-dev-info { margin-top:14px; border-top:1px solid rgba(255,255,255,.07); padding-top:12px; }
+  .l2d-dev-info-toggle { display:flex; align-items:center; gap:6px; background:none; border:none; color:var(--dim); font-size:10.5px; font-weight:700; cursor:pointer; padding:2px 0; font-family:var(--sans); }
+  .l2d-dev-info-toggle svg { transition:transform .2s ease; }
+  .l2d-dev-info-toggle.open svg { transform:rotate(90deg); }
+  .l2d-dev-info-body { display:none; padding-top:10px; }
+  .l2d-dev-info-body.open { display:block; }
+  #l2d-player .lb-meta { color:var(--dim); font:10.5px var(--mono); word-break:break-all; margin-bottom:8px; }
+  #l2d-player .lb-info { display:flex; gap:16px; flex-wrap:wrap; font-size:11px; color:var(--dim); padding-bottom:9px; }
+  #l2d-player .lb-info b { color:var(--text); font-weight:650; }
+  .l2d-dev-info .lb-actions { padding-top:3px; }
+  .l2d-dev-info .lb-icon-btn { width:34px; height:34px; border-radius:9px; }
+
+  @media (max-width: 700px) {
+    .l2d-topbar { top:10px; left:10px; right:10px; }
+    .l2d-model-heading { max-width:calc(100vw - 132px); padding:9px 11px; border-radius:12px; }
+    #l2d-model-name { font-size:12px; }
+    .l2d-live-pill { display:none; }
+    .l2d-top-actions { gap:3px; padding:4px; border-radius:12px; }
+    .l2d-top-btn { width:36px; height:36px; }
+    #l2d-transport-panel { top:64px; left:10px; width:calc(100vw - 20px); padding:11px; }
+    .l2d-transport-shortcut { display:none; }
+    #l2d-drawer { left:10px; right:10px; bottom:10px; max-height:62vh; border-radius:17px; }
+    #l2d-drawer-body { padding:12px 12px 14px; }
+    .l2d-stage-hint { bottom:70px; font-size:9px; max-width:calc(100vw - 40px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #l2d-debug-overlay { top:65px; left:10px; right:10px; }
+  }
+  @media (max-width: 420px) {
+    .l2d-top-btn { width:34px; height:34px; }
+    #l2d-transport-panel .l2d-transport { gap:6px; }
+    .l2d-speed-group { display:none; }
+    .l2d-anim-group { padding:9px; }
+    .l2d-anim-btn { flex:1 1 auto; }
+  }
 
   /* ---------- Confirm Modal ---------- */
   #confirm-modal {
@@ -408,11 +644,182 @@
     #lightbox { padding: 20px 16px; justify-content: flex-start; padding-top: 80px; padding-bottom: 80px; }
     #lightbox img, #lightbox video { max-height: 50vh; }
     #lb-close { top: 16px; right: 16px; font-size: 24px; width: 40px; height: 40px; }
+
+    #l2d-close { top: 16px; right: 16px; font-size: 24px; width: 40px; height: 40px; }
+    #l2d-reset-cam { top: 16px; right: 68px; width: 40px; height: 40px; }
+    #l2d-transport-toggle { top: 16px; left: 16px; width: 40px; height: 40px; }
+    #l2d-transport-panel { top: 64px; left: 12px; right: 12px; max-width: none; }
   }
 
   @media (hover: none) {
     .cell:active { transform: scale(0.98); border-color: var(--accent); }
   }
+
+
+  /* ================================================================
+     GALL.Y — SIDEBAR + MEDIA LIGHTBOX POLISH
+     ================================================================ */
+  #sidebar {
+    background:
+      linear-gradient(180deg, rgba(25,25,36,.98), rgba(14,14,20,.99));
+    border-right-color: rgba(255,255,255,.075);
+    box-shadow: 18px 0 50px rgba(0,0,0,.12);
+  }
+  #sidebar::after {
+    content:''; position:absolute; top:0; right:-1px; width:1px; height:100%;
+    background:linear-gradient(180deg, transparent, rgba(129,140,248,.25), transparent);
+    pointer-events:none;
+  }
+  .sb-header {
+    padding:18px 16px 16px;
+    background:linear-gradient(180deg, rgba(255,255,255,.025), transparent);
+    border-bottom-color:rgba(255,255,255,.065);
+  }
+  .sb-header-top { margin-bottom:14px; }
+  .sb-title {
+    font-size:19px; letter-spacing:-.02em; display:flex; align-items:center; gap:2px;
+  }
+  .sb-title::before {
+    content:''; width:7px; height:7px; border-radius:50%; background:var(--accent);
+    box-shadow:0 0 12px rgba(129,140,248,.65); margin-right:5px;
+  }
+  #download-folder-btn {
+    padding:7px 9px; border-radius:9px; background:rgba(255,255,255,.045);
+    border-color:rgba(255,255,255,.08); font-size:11px;
+  }
+  #download-folder-btn span { display:none; }
+  #download-folder-btn:hover { background:rgba(129,140,248,.1); }
+  #sb-search {
+    height:40px; padding:0 12px 0 39px; border-radius:11px;
+    background:rgba(7,7,11,.55); border-color:rgba(255,255,255,.08);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+  }
+  #sb-search:focus { border-color:rgba(129,140,248,.55); box-shadow:0 0 0 3px rgba(129,140,248,.09); }
+  .sb-header { position:relative; }
+  .sb-header::after {
+    content:'⌕'; position:absolute; left:29px; bottom:26px; color:var(--dim); font-size:18px;
+    pointer-events:none; line-height:1;
+  }
+  #tree { padding:10px 9px 14px; scrollbar-width:thin; }
+  .tsection-label { padding:10px 10px 7px; font-size:9px; letter-spacing:.13em; opacity:.72; }
+  .tdivider { margin:9px 8px; background:rgba(255,255,255,.055); }
+  .trow {
+    min-height:38px; padding:7px 9px; border:1px solid transparent; border-radius:10px;
+    color:#a7a7b8; font-size:13px;
+  }
+  .trow:hover { background:rgba(255,255,255,.045); border-color:rgba(255,255,255,.045); }
+  .trow.selected {
+    background:linear-gradient(90deg, rgba(129,140,248,.16), rgba(129,140,248,.055));
+    border-color:rgba(129,140,248,.18); color:#d9d9ff;
+    box-shadow:inset 3px 0 0 var(--accent);
+  }
+  .chev-btn { border-radius:7px; color:#7f7f91; }
+  .chev-btn:hover { background:rgba(255,255,255,.07); }
+  .children { margin-left:18px; padding-left:7px; border-left-color:rgba(255,255,255,.07); }
+  .count {
+    font-size:10px; padding:2px 6px; border-radius:999px; background:rgba(255,255,255,.045);
+    border:1px solid rgba(255,255,255,.05); opacity:.85;
+  }
+  .sb-footer {
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));
+    background:rgba(0,0,0,.18); border-top-color:rgba(255,255,255,.065);
+    font-size:9.5px; color:#747486;
+  }
+  .sb-footer a { color:#9fa5ff; }
+  #sb-toggle {
+    width:48px; height:48px; border-radius:14px; bottom:20px; right:20px;
+    background:rgba(22,22,31,.9); border-color:rgba(255,255,255,.1);
+    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+  }
+  #sb-toggle:hover { background:rgba(129,140,248,.13); }
+  #sb-overlay { background:rgba(2,2,6,.68); backdrop-filter:blur(4px); }
+
+  .lb-top-label {
+    position:fixed; top:22px; left:24px; z-index:110; color:rgba(255,255,255,.42);
+    font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.14em;
+    pointer-events:none;
+  }
+
+  /* Media lightbox: image-first, details-second. */
+  #lightbox {
+    padding:28px; background:rgba(4,4,8,.88); backdrop-filter:blur(18px) saturate(120%);
+    -webkit-backdrop-filter:blur(18px) saturate(120%); gap:0;
+  }
+  #lightbox::before {
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background:radial-gradient(circle at 50% 38%, rgba(129,140,248,.09), transparent 43%);
+  }
+  #lightbox.open #lb-media { animation:lbMediaIn .24s cubic-bezier(.16,1,.3,1); }
+  @keyframes lbMediaIn { from { opacity:0; transform:scale(.975) translateY(8px); } to { opacity:1; transform:none; } }
+  #lb-media {
+    position:relative; z-index:1; display:flex; align-items:center; justify-content:center;
+    width:min(1100px,92vw); min-height:160px; max-height:calc(100vh - 260px);
+    padding:10px; border-radius:18px; background:rgba(8,8,13,.42);
+    border:1px solid rgba(255,255,255,.07); box-shadow:0 30px 90px rgba(0,0,0,.58), inset 0 1px 0 rgba(255,255,255,.035);
+  }
+  #lightbox img, #lightbox video {
+    max-width:100%; max-height:calc(100vh - 280px); border-radius:10px;
+    box-shadow:0 18px 50px rgba(0,0,0,.42);
+  }
+  .lb-details {
+    position:relative; z-index:2; margin-top:-1px; width:min(920px,92vw); max-width:none;
+    padding:15px 16px 14px; border-radius:0 0 17px 17px;
+    background:rgba(18,18,27,.9); border-color:rgba(255,255,255,.08);
+    box-shadow:0 20px 60px rgba(0,0,0,.5); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+  }
+  #lightbox .lb-meta {
+    text-align:left; font-family:var(--sans); font-size:13px; font-weight:700; margin:0 0 8px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text);
+  }
+  #lightbox .lb-meta::before {
+    content:'FILE'; color:var(--accent); font-size:8px; letter-spacing:.12em; margin-right:8px; vertical-align:2px;
+  }
+  #lightbox .lb-info {
+    justify-content:flex-start; gap:0; padding:0; border:0; font-size:11px;
+  }
+  #lightbox .lb-info span {
+    padding:0 13px; border-right:1px solid rgba(255,255,255,.08);
+  }
+  #lightbox .lb-info span:first-child { padding-left:0; }
+  #lightbox .lb-info span:last-child { border-right:0; }
+  #lightbox .lb-info b { margin-left:3px; }
+  #lightbox .lb-actions {
+    position:absolute; right:14px; bottom:12px; margin:0; gap:6px;
+  }
+  .lb-icon-btn {
+    width:38px; height:38px; border-radius:10px; background:rgba(255,255,255,.045);
+    border-color:rgba(255,255,255,.08); color:#d5d5df;
+  }
+  .lb-icon-btn:hover { transform:translateY(-1px); background:rgba(129,140,248,.16); border-color:rgba(129,140,248,.35); }
+  #lb-download { background:var(--accent-dim); }
+  #lb-download::after { content:'Download'; margin-left:7px; font-size:11px; font-weight:700; }
+  #lb-download { width:auto; padding:0 12px; }
+  #lb-close {
+    top:18px; right:20px; width:42px; height:42px; z-index:110; font-size:0;
+    background:rgba(17,17,25,.78); border-color:rgba(255,255,255,.09); backdrop-filter:blur(14px);
+  }
+  #lb-close::before, #lb-close::after { content:''; position:absolute; width:16px; height:1.5px; background:currentColor; border-radius:2px; }
+  #lb-close::before { transform:rotate(45deg); } #lb-close::after { transform:rotate(-45deg); }
+  #lb-close:hover { background:rgba(239,68,68,.14); border-color:rgba(239,68,68,.25); }
+
+  @media (max-width:860px) {
+    #sidebar { width:min(88vw,350px); box-shadow:20px 0 55px rgba(0,0,0,.65); }
+    .sb-header { padding-top:calc(16px + env(safe-area-inset-top,0px)); }
+    #lightbox { padding:18px 12px; justify-content:center; }
+    #lb-media { width:calc(100vw - 24px); max-height:calc(100vh - 230px); padding:6px; border-radius:15px; }
+    #lightbox img, #lightbox video { max-height:calc(100vh - 245px); }
+    .lb-details { width:calc(100vw - 24px); padding:14px 14px 62px; border-radius:0 0 15px 15px; }
+    #lightbox .lb-info { display:grid; grid-template-columns:1fr 1fr; row-gap:8px; }
+    #lightbox .lb-info span { padding:0; border:0; }
+    #lightbox .lb-actions { left:14px; right:14px; bottom:12px; justify-content:flex-end; }
+    #lb-close { top:12px; right:12px; }
+  }
+  @media (max-width:420px) {
+    #lb-download::after { content:'Save'; }
+    #lightbox .lb-info { grid-template-columns:1fr; }
+    .sb-footer { display:none; }
+  }
+
 </style>
 </head>
 <body>
@@ -471,7 +878,8 @@
   </main>
 </div>
 
-<div id="lightbox">
+<div id="lightbox" role="dialog" aria-modal="true" aria-label="Media preview">
+  <div class="lb-top-label">Preview</div>
   <button id="lb-close" aria-label="Close">&times;</button>
   <div id="lb-media"></div>
   <div class="lb-details">
@@ -492,6 +900,99 @@
   </div>
 </div>
 
+<div id="l2d-player" aria-label="Live2D viewer">
+  <div class="l2d-topbar">
+    <div class="l2d-model-heading">
+      <div class="l2d-kicker">Live2D Preview</div>
+      <div class="l2d-title-row">
+        <strong id="l2d-model-name">—</strong>
+        <span class="l2d-live-pill">Interactive</span>
+      </div>
+    </div>
+    <div class="l2d-top-actions">
+      <button id="l2d-reset-cam" class="l2d-top-btn" aria-label="Reset camera" title="Reset camera (R)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      </button>
+      <button id="l2d-transport-toggle" class="l2d-top-btn" aria-label="Show playback controls" title="Playback controls (Space)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8V4z"/></svg>
+      </button>
+      <button id="l2d-close" class="l2d-top-btn close" aria-label="Close viewer" title="Close (Esc)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="l2d-transport-panel" aria-label="Playback controls">
+    <div class="l2d-transport-head">
+      <span class="l2d-transport-label">Playback</span>
+      <span class="l2d-transport-shortcut">Space to play · R to reset</span>
+    </div>
+    <div class="l2d-transport">
+      <button id="l2d-play-toggle" class="l2d-ctrl-btn active" title="Play/Pause" aria-label="Play or pause animation"></button>
+      <input id="l2d-scrubber" type="range" min="0" max="1000" value="0" step="1" aria-label="Animation timeline">
+      <div class="l2d-speed-group" id="l2d-speed-group">
+        <button class="l2d-speed-btn" data-speed="0.5">0.5x</button>
+        <button class="l2d-speed-btn active" data-speed="1">1x</button>
+        <button class="l2d-speed-btn" data-speed="2">2x</button>
+      </div>
+      <button id="l2d-loop-toggle" class="l2d-ctrl-btn active" title="Loop: on" aria-label="Toggle loop">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="l2d-stage">
+    <canvas id="l2d-canvas"></canvas>
+    <div id="l2d-status"></div>
+    <div id="l2d-debug-overlay"></div>
+  </div>
+  <div class="l2d-stage-hint">Drag to move · Scroll or pinch to zoom</div>
+
+  <div id="l2d-drawer">
+    <div id="l2d-drawer-handle" role="button" tabindex="0" aria-expanded="false" aria-controls="l2d-drawer-body">
+      <div class="l2d-drawer-handle-left">
+        <div class="l2d-drawer-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/></svg>
+        </div>
+        <div>
+          <div id="l2d-drawer-title">Model details</div>
+          <div class="l2d-drawer-state">Animations · variants · model info</div>
+        </div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+    </div>
+    <div id="l2d-drawer-body">
+      <div class="l2d-now-playing-row">
+        <div class="l2d-now-playing">
+          <span>Now playing</span>
+          <b id="l2d-now-playing-name">—</b>
+        </div>
+      </div>
+
+      <div id="l2d-variant-group" class="l2d-variant-group"></div>
+      <div id="l2d-anim-groups"></div>
+
+      <div class="l2d-dev-info">
+        <button class="l2d-dev-info-toggle" id="l2d-dev-info-toggle">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          Technical details
+        </button>
+        <div class="l2d-dev-info-body" id="l2d-dev-info-body">
+          <div class="lb-meta" id="l2d-path"></div>
+          <div class="lb-info" id="l2d-info">
+            <span>Spine version: <b id="l2d-version">…</b></span>
+          </div>
+          <div class="lb-actions">
+            <a id="l2d-github" class="lb-icon-btn" href="#" target="_blank" rel="noopener" title="View Source on GitHub">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="confirm-modal">
   <div class="confirm-box">
     <div class="confirm-title" id="confirm-title">Confirm</div>
@@ -507,10 +1008,19 @@
 const OWNER = "myssal";
 const REPO = "Reverse-1999-CN-Asset";
 const BRANCH = "master";
-const VIDEO_EXT = /\.(mp4|webm|mov|m4v|avi|mkv)$/i;
-const MEDIA_EXT = /\.(png|jpe?g|webp|gif|mp4|webm|mov|m4v|avi|mkv)$/i;
-const ALLOWED_PREFIXES = ['singlebg/', 'live2d/roles/', 'atlassrc/', 'singlebg_lang/', 'video/'];
-const PINNED_PATHS = ['singlebg/headicon_img', 'singlebg/headicon_middle'];
+const IMAGE_EXT = /\.(png|jpe?g|webp|gif)$/i;
+const ALLOWED_PREFIXES = ['singlebg/', 'atlassrc/', 'singlebg_lang/'];
+// Each pinned path also carries its own sidebar label (distinct from the
+// raw repo path), since "singlebg/headicon_img" etc. is the folder's real
+// location but not what we want to show in the Favorites list.
+const PINNED_PATHS = [
+  { path: 'singlebg/headicon_img', label: 'headicon_img' },
+  { path: 'singlebg/headicon_middle', label: 'headicon_middle' }
+];
+// Plain path strings derived from PINNED_PATHS, for the many places that
+// just need to test "is this folder path one of the pinned ones" without
+// caring about the display label.
+const PINNED_FOLDER_PATHS = PINNED_PATHS.map(p => p.path);
 
 const RAW_BASE = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/`;
 const BLOB_BASE = `https://github.com/${OWNER}/${REPO}/blob/${BRANCH}/`;
@@ -540,6 +1050,7 @@ const clearSelectionBtn = document.getElementById('clear-selection-btn');
 const downloadFolderBtn = document.getElementById('download-folder-btn');
 
 const FOLDER_SVG = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M2.5 5.5C2.5 4.67 3.17 4 4 4h4.5l1.8 2H16c.83 0 1.5.67 1.5 1.5v7c0 .83-.67 1.5-1.5 1.5H4c-.83 0-1.5-.67-1.5-1.5v-9Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+const LIVE2D_SVG = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.3" stroke="currentColor" stroke-width="1.4"/><path d="M8.2 6.8v6.4L13.4 10 8.2 6.8Z" fill="currentColor"/></svg>';
 
 let allImages = [];
 let folderTree = {};
@@ -553,6 +1064,37 @@ let selectMode = false;
 const selectedPaths = new Set();
 const dateCache = new Map();
 let rootFolderNames = [];
+
+// ---------- Live2D / Spine models ----------
+// Three separate directories in the repo each hold their own set of Spine
+// character models (folder per character, containing a .skel + .atlas +
+// one or more .png pages). They're unrelated to each other content-wise
+// (different art: story prefabs, in-game roles, bust/portrait variants) so
+// each gets its own sidebar entry and its own model list, but they all use
+// the exact same discovery/detection/player logic below.
+const SPINE_SOURCES = [
+  { key: 'rolesprefab', prefix: 'rolesstory/rolesprefab/', label: 'rolesprefab' },
+  { key: 'roles',       prefix: 'roles/',                  label: 'roles' },
+  { key: 'roles_bust',  prefix: 'roles_bust/',              label: 'roles_bust' }
+];
+// key -> array of models, same shape as before:
+// [{ key, folderPath, name, skelPath, atlasPath, pngPaths:[], version, versionStatus }]
+const spineModelsBySource = new Map(SPINE_SOURCES.map(s => [s.key, []]));
+const skelVersionCache = new Map(); // skelPath -> detected version string or null
+let showingSpineSource = null; // null, or one of SPINE_SOURCES[].key
+
+// Sidebar rows for each Spine source reuse the existing path-string-based
+// selection/routing (selectedFolder, selectFolder(), applyFilters()) rather
+// than a parallel mechanism — each source just gets a reserved, non-real
+// path of the form "__spine__:<sourceKey>" that can't collide with an
+// actual repo folder path.
+function spineRowPath(sourceKey){ return `__spine__:${sourceKey}`; }
+function spineSourceKeyFromPath(path){
+  return typeof path === 'string' && path.startsWith('__spine__:') ? path.slice('__spine__:'.length) : null;
+}
+
+// known spine-webgl CDN builds we can load, keyed by "major.minor"
+const SPINE_RUNTIME_VERSIONS = ['3.6', '3.7', '3.8', '4.0', '4.1', '4.2'];
 
 function showLoadingState(){
   stateOverlay.className = 'active';
@@ -585,14 +1127,16 @@ async function init(){
     rootFolderNames = [...rootSet].sort();
 
     allImages = tree
-      .filter(item => item.type === 'blob' && MEDIA_EXT.test(item.path))
+      .filter(item => item.type === 'blob' && IMAGE_EXT.test(item.path))
       .filter(item => ALLOWED_PREFIXES.some(p => item.path.startsWith(p)))
       .map(item => {
         const parts = item.path.split('/');
         const name = parts[parts.length - 1];
         const folder = parts.slice(0, -1).join('/');
-        return { path: item.path, name, folder, isVideo: VIDEO_EXT.test(item.path) };
+        return { path: item.path, name, folder };
       });
+
+    discoverLive2DModels(tree);
 
     buildFolderTree();
     renderTree();
@@ -617,6 +1161,236 @@ function showError(title, msg){
 }
 retryBtn.addEventListener('click', init);
 
+function discoverLive2DModels(tree){
+  SPINE_SOURCES.forEach(source => {
+    const buckets = new Map(); // folderPath -> { skels:[], atlas, pngs:[] }
+
+    tree.forEach(item => {
+      if(item.type !== 'blob') return;
+      if(!item.path.startsWith(source.prefix)) return;
+
+      const parts = item.path.split('/');
+      const fileName = parts[parts.length - 1];
+      const folderPath = parts.slice(0, -1).join('/');
+
+      if(!buckets.has(folderPath)) buckets.set(folderPath, { skels: [], pngs: [] });
+      const bucket = buckets.get(folderPath);
+
+      if(/\.skel$/i.test(fileName)){
+        // A folder can hold multiple skeletons sharing one atlas — confirmed
+        // in roles/, e.g. 634103_jiexika3_fight.skel, _room.skel, _ui.skel
+        // all paired with the single unsuffixed 634103_jiexika3.atlas. Each
+        // is a distinct rig/animation-set (combat, idle, portrait, etc.)
+        // and deserves its own playable entry, not just whichever .skel the
+        // tree scan happened to encounter last.
+        bucket.skels.push(item.path);
+      } else if(/\.atlas$/i.test(fileName)){
+        bucket.atlas = item.path;
+      } else if(/\.png$/i.test(fileName)){
+        bucket.pngs.push(item.path);
+      }
+    });
+
+    // Bucketing is purely "same folder" — deliberately NOT matching skel/
+    // atlas by file base name. Different Spine sources in this repo name
+    // their files differently (rolesstory/rolesprefab pairs
+    // 300301_hujisheng_p.skel with a same-stem .atlas, while roles/ pairs
+    // one or more differently-stemmed .skel files — e.g. "..._ui.skel" —
+    // with a single unsuffixed shared .atlas in the same folder). One
+    // folder is trusted to hold exactly one atlas shared by all skeletons
+    // found in it.
+    //
+    // One model entry per FOLDER (not per skeleton) — a folder with several
+    // skeletons (e.g. roles/634103_jiexika3/ holding _fight.skel, _room.skel,
+    // _ui.skel) is one character with several playable variants, not
+    // several unrelated grid cards; that was crowding the roles/ grid with
+    // near-duplicate entries for the same character. Every skeleton found
+    // is kept, in model.skelVariants, so the player can switch between them
+    // without losing any of them — the sort below just decides which one
+    // loads first when the card is opened.
+    const models = [];
+    buckets.forEach((files, folderPath) => {
+      // only a genuine Spine model folder if it has at least one skeleton,
+      // an atlas, and texture pages
+      if(files.skels.length === 0 || !files.atlas || files.pngs.length === 0) return;
+      const folderName = folderPath.split('/').pop();
+
+      const skelVariants = files.skels
+        .map(skelPath => ({ path: skelPath, label: skelPath.split('/').pop().replace(/\.skel$/i, '') }))
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, {numeric:true}));
+
+      // Default to whichever skeleton's stem exactly matches the folder
+      // name if one does (the "primary"/unsuffixed one, when present
+      // alongside suffixed variants); otherwise just the alphabetically
+      // first — predictable rather than guessing at which variant
+      // (fight/room/ui/etc.) is most representative.
+      const defaultVariant = skelVariants.find(v => v.label === folderName) || skelVariants[0];
+
+      models.push({
+        key: folderPath,
+        folderPath,
+        name: folderName,
+        skelPath: defaultVariant.path,
+        skelVariants,
+        atlasPath: files.atlas,
+        pngPaths: files.pngs,
+        version: null,
+        versionStatus: 'unknown' // unknown | detecting | detected | unsupported | failed
+      });
+    });
+
+    models.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric:true}));
+    spineModelsBySource.set(source.key, models);
+  });
+}
+
+// Parses a Spine .atlas file's text to find the page (texture) filenames it
+// actually declares — used to pick the correct thumbnail PNG for a model
+// instead of trusting "whichever .png happened to be first in the folder"
+// (models/spec sources — verified specifically in roles_bust/ — can contain
+// unrelated loose images, e.g. a static preview/cover, sitting in the same
+// folder as the real Spine atlas pages; that unrelated image sorting first
+// was showing up as the card thumbnail).
+//
+// Matches the exact rule read directly from spine-webgl 4.2's own
+// TextureAtlas.ts parser: blank lines before the first entry are ignored,
+// then header fields (size/format/filter/...) are consumed, then each
+// non-blank line that ISN'T a recognized "key: value"/"key:\n value" field
+// starts a new page, named by that line's own (trimmed) text.
+function parseAtlasPageNames(atlasText){
+  const lines = atlasText.split(/\r?\n/);
+  const pageNames = [];
+  let i = 0;
+  // Ignore empty lines before first entry.
+  while(i < lines.length && lines[i].trim().length === 0) i++;
+  // Header entries (lines containing a ':' before the first page name).
+  while(i < lines.length && lines[i].trim().length > 0 && lines[i].includes(':')) i++;
+
+  let expectPage = true;
+  for(; i < lines.length; i++){
+    const line = lines[i];
+    if(line.trim().length === 0){ expectPage = true; continue; }
+    if(expectPage){
+      pageNames.push(line.trim());
+      expectPage = false;
+    }
+    // Lines belonging to the current page/region (key: value pairs) are
+    // skipped here — we only need page names, not full region parsing.
+  }
+  return pageNames;
+}
+
+// Cache of folderPath -> Promise<string[]> (resolved page filenames), so
+// re-rendering a card (e.g. re-filtering the grid) doesn't re-fetch the
+// same .atlas text repeatedly.
+const modelAtlasPageNamesCache = new Map();
+function getModelPreviewPngPath(model){
+  if(modelAtlasPageNamesCache.has(model.folderPath)){
+    return modelAtlasPageNamesCache.get(model.folderPath);
+  }
+  const atlasUrl = RAW_BASE + model.atlasPath.split('/').map(encodeURIComponent).join('/');
+  const p = fetch(atlasUrl)
+    .then(r => { if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
+    .then(text => {
+      const pageNames = parseAtlasPageNames(text);
+      const matched = model.pngPaths.find(p => pageNames.includes(p.split('/').pop()));
+      return matched || model.pngPaths[0]; // fall back if nothing matched (shouldn't normally happen)
+    })
+    .catch(() => model.pngPaths[0]); // network hiccup: fall back rather than leave the thumbnail broken
+  modelAtlasPageNamesCache.set(model.folderPath, p);
+  return p;
+}
+
+
+// The header begins with two length-prefixed UTF-8 strings (hash, then version),
+// each length encoded as a Spine-style varint byte count. Exact byte-level framing
+// can vary slightly across Spine's own format revisions, so this is deliberately
+// defensive: it scans a bounded window near the start of the file for a string
+// that looks like a genuine version ("3.8.75", "4.1.24", etc.) rather than trusting
+// one fixed offset. If nothing convincing turns up, detection fails closed
+// (falls back to the static texture view) instead of guessing.
+function readVarInt(view, offset){
+  let result = 0, shift = 0, b, pos = offset;
+  for(let i = 0; i < 5 && pos < view.byteLength; i++){
+    b = view.getUint8(pos++);
+    result |= (b & 0x7F) << shift;
+    shift += 7;
+    if(!(b & 0x80)) break;
+  }
+  return { value: result >>> 0, next: pos };
+}
+
+function looksLikeVersion(str){
+  return /^\d{1,2}\.\d{1,2}(\.\d{1,3})?(-beta)?$/.test(str);
+}
+
+function parseSpineVersionFromBuffer(buf){
+  try{
+    const view = new DataView(buf);
+    const bytes = new Uint8Array(buf);
+    const decoder = new TextDecoder('utf-8', { fatal: false });
+
+    // Try walking length-prefixed strings starting from a few plausible offsets,
+    // since the hash string's own length shifts where the version string begins.
+    const candidates = [];
+    let { value: firstLen, next } = readVarInt(view, 0);
+    // hash bytes (length may be 0 meaning null/empty)
+    let pos = next + Math.max(0, firstLen);
+    if(pos < view.byteLength){
+      const { value: secondLen, next: next2 } = readVarInt(view, pos);
+      if(secondLen > 0 && secondLen < 32 && next2 + secondLen <= view.byteLength){
+        const str = decoder.decode(bytes.slice(next2, next2 + secondLen)).replace(/\0+$/, '');
+        candidates.push(str);
+      }
+    }
+
+    // Fallback: scan the first 400 bytes for any printable run matching a version
+    // pattern, in case the exact varint framing above didn't land correctly.
+    const scanWindow = decoder.decode(bytes.slice(0, Math.min(400, bytes.length)));
+    const matches = scanWindow.match(/\d{1,2}\.\d{1,2}\.\d{1,3}(-beta)?/g);
+    if(matches) candidates.push(...matches);
+
+    for(const c of candidates){
+      if(looksLikeVersion(c)) return c;
+    }
+    return null;
+  } catch(e){
+    return null;
+  }
+}
+
+function versionToRuntimeKey(versionStr){
+  if(!versionStr) return null;
+  const m = versionStr.match(/^(\d+)\.(\d+)/);
+  if(!m) return null;
+  const key = `${m[1]}.${m[2]}`;
+  return SPINE_RUNTIME_VERSIONS.includes(key) ? key : null;
+}
+
+async function detectModelVersion(model){
+  if(model.versionStatus === 'detected' || model.versionStatus === 'unsupported') return model;
+  model.versionStatus = 'detecting';
+  try{
+    const rawUrl = RAW_BASE + model.skelPath.split('/').map(encodeURIComponent).join('/');
+    // only need the first couple hundred bytes to find hash+version strings
+    const res = await fetch(rawUrl, { headers: { 'Range': 'bytes=0-511' } });
+    if(!res.ok && res.status !== 206){
+      model.versionStatus = 'failed';
+      return model;
+    }
+    const buf = await res.arrayBuffer();
+    const version = parseSpineVersionFromBuffer(buf);
+    model.version = version;
+    const runtimeKey = versionToRuntimeKey(version);
+    model.runtimeKey = runtimeKey;
+    model.versionStatus = runtimeKey ? 'detected' : 'unsupported';
+  } catch(e){
+    console.error('Version detection failed for', model.skelPath, e);
+    model.versionStatus = 'failed';
+  }
+  return model;
+}
+
 function buildFolderTree(){
   folderTree = {};
   allImages.forEach(img => {
@@ -633,7 +1407,7 @@ function buildFolderTree(){
 }
 
 function pinnedCount(){
-  return allImages.filter(img => PINNED_PATHS.includes(img.folder)).length;
+  return allImages.filter(img => PINNED_FOLDER_PATHS.includes(img.folder)).length;
 }
 
 function sortedValues(obj){
@@ -655,10 +1429,29 @@ function renderTree(){
     favLabel.textContent = 'Favorites';
     treeEl.appendChild(favLabel);
 
-    PINNED_PATHS.forEach(path => {
+    PINNED_PATHS.forEach(({ path, label }) => {
       const count = allImages.filter(img => img.folder === path).length;
       if(count > 0){
-        treeEl.appendChild(makeSimpleRow(path, path, count, 'star'));
+        treeEl.appendChild(makeSimpleRow(label, path, count, 'star'));
+      }
+    });
+  }
+
+  const totalSpineModels = SPINE_SOURCES.reduce((sum, s) => sum + spineModelsBySource.get(s.key).length, 0);
+  if(totalSpineModels > 0){
+    const divider3 = document.createElement('div');
+    divider3.className = 'tdivider';
+    treeEl.appendChild(divider3);
+
+    const l2dLabel = document.createElement('div');
+    l2dLabel.className = 'tsection-label';
+    l2dLabel.textContent = 'Spines';
+    treeEl.appendChild(l2dLabel);
+
+    SPINE_SOURCES.forEach(source => {
+      const count = spineModelsBySource.get(source.key).length;
+      if(count > 0){
+        treeEl.appendChild(makeSimpleRow(source.label, spineRowPath(source.key), count, 'live2d'));
       }
     });
   }
@@ -689,7 +1482,7 @@ function makeSimpleRow(label, path, count, iconType){
 
   const icon = document.createElement('span');
   icon.className = 'folder-icon';
-  icon.innerHTML = FOLDER_SVG;
+  icon.innerHTML = iconType === 'live2d' ? LIVE2D_SVG : FOLDER_SVG;
   main.appendChild(icon);
 
   const labelEl = document.createElement('span');
@@ -774,7 +1567,8 @@ function toggleFolder(path){
 
 function selectFolder(path){
   selectedFolder = path;
-  if(path && path !== '__pinned__' && !PINNED_PATHS.includes(path)){
+  showingSpineSource = spineSourceKeyFromPath(path);
+  if(path && path !== '__pinned__' && !showingSpineSource && !PINNED_FOLDER_PATHS.includes(path)){
     const parts = path.split('/');
     let acc = [];
     for(let i = 0; i < parts.length - 1; i++){
@@ -788,9 +1582,15 @@ function selectFolder(path){
 }
 
 function applyFilters(){
+  if(showingSpineSource){
+    downloadFolderBtn.style.display = 'none';
+    applyLive2DFilters(showingSpineSource);
+    return;
+  }
+  downloadFolderBtn.style.display = '';
   const q = searchQuery.trim().toLowerCase();
   filtered = allImages.filter(img => {
-    if(PINNED_PATHS.includes(selectedFolder)){
+    if(PINNED_FOLDER_PATHS.includes(selectedFolder)){
       if(img.folder !== selectedFolder) return false;
     } else if(selectedFolder){
       if(!(img.folder === selectedFolder || img.folder.startsWith(selectedFolder + '/'))) return false;
@@ -799,6 +1599,7 @@ function applyFilters(){
     return true;
   });
   grid.innerHTML = '';
+  grid.classList.remove('live2d-grid');
   renderedCount = 0;
   const label = selectedFolder || 'All Resources';
   crumbEl.innerHTML = `<b>${label}</b> <span style="opacity:0.6;font-size:13px;padding-left:8px">— ${filtered.length.toLocaleString()} file${filtered.length===1?'':'s'}</span>`;
@@ -817,7 +1618,82 @@ function applyFilters(){
   renderNextBatch();
 }
 
+function applyLive2DFilters(sourceKey){
+  const source = SPINE_SOURCES.find(s => s.key === sourceKey);
+  const models = spineModelsBySource.get(sourceKey) || [];
+  const q = searchQuery.trim().toLowerCase();
+  const list = q ? models.filter(m => m.name.toLowerCase().includes(q) || m.folderPath.toLowerCase().includes(q)) : models;
+
+  // Defense in depth alongside the showingSpineSource guard in
+  // renderNextBatch(): also drop the regular-grid's own data so a stray
+  // call can't render anything even if the guard above it is ever bypassed.
+  filtered = [];
+  renderedCount = 0;
+
+  grid.innerHTML = '';
+  grid.classList.add('live2d-grid');
+  emptyEl.style.display = list.length === 0 ? 'block' : 'none';
+  emptyEl.textContent = 'No Spine models match your search.';
+  const label = source ? source.label : 'Spine';
+  crumbEl.innerHTML = `<b>${label}</b> <span style="opacity:0.6;font-size:13px;padding-left:8px">— ${list.length.toLocaleString()} model${list.length===1?'':'s'}</span>`;
+
+  const fragment = document.createDocumentFragment();
+  list.forEach(model => fragment.appendChild(renderLive2DCard(model)));
+  grid.appendChild(fragment);
+}
+
+function renderLive2DCard(model){
+  const cell = document.createElement('div');
+  cell.className = 'cell live2d-cell';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'thumb-wrap';
+
+  const imEl = document.createElement('img');
+  imEl.loading = 'lazy';
+  imEl.decoding = 'async';
+  imEl.alt = model.name;
+  imEl.addEventListener('load', () => imEl.classList.add('loaded'));
+  wrap.appendChild(imEl);
+
+  // Resolve the real preview PNG (one the model's .atlas actually declares
+  // as a page) asynchronously rather than assuming pngPaths[0] — some
+  // folders (confirmed in roles_bust/) contain an unrelated loose image
+  // alongside the genuine Spine atlas pages, and that unrelated image can
+  // sort first in the raw file listing.
+  getModelPreviewPngPath(model).then(previewPath => {
+    imEl.src = RAW_BASE + previewPath.split('/').map(encodeURIComponent).join('/');
+  });
+
+  const badge = document.createElement('span');
+  badge.className = 'play-badge';
+  badge.innerHTML = LIVE2D_SVG + ' Live2D';
+  wrap.appendChild(badge);
+
+  cell.appendChild(wrap);
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'name';
+  nameEl.textContent = model.name;
+  cell.appendChild(nameEl);
+
+  cell.addEventListener('click', () => openLive2DPlayer(model));
+  return cell;
+}
+
 function renderNextBatch(){
+  // The IntersectionObserver watching #sentinel below is registered once
+  // and stays active for the page's whole lifetime — it has no way to know
+  // the grid currently on screen belongs to a Spine source instead of the
+  // regular image browser. Without this guard, scrolling (or even a layout
+  // shift re-triggering the intersection) while a Spine view is open would
+  // call this function anyway, which reads the module-level `filtered`
+  // array — last populated by whichever regular-image view was open
+  // before switching to Spine, and never cleared on that switch — and
+  // append its (unrelated) image cards straight into the Spine grid.
+  // Confirmed as the actual cause of stray atlassrc/ui_modules/... cards
+  // appearing in the roles_bust view after visiting "All" first.
+  if(showingSpineSource) return;
   const slice = filtered.slice(renderedCount, renderedCount + BATCH);
   if(slice.length === 0) return;
 
@@ -840,28 +1716,14 @@ function renderNextBatch(){
 
     const src = RAW_BASE + img.path.split('/').map(encodeURIComponent).join('/');
 
-    if(img.isVideo){
-      const vEl = document.createElement('video');
-      vEl.src = src;
-      vEl.muted = true;
-      vEl.playsInline = true;
-      vEl.preload = 'metadata';
-      vEl.addEventListener('loadeddata', () => vEl.classList.add('loaded'));
-      wrap.appendChild(vEl);
-      const badge = document.createElement('span');
-      badge.className = 'play-badge';
-      badge.textContent = '▶ video';
-      wrap.appendChild(badge);
-    } else {
-      const imEl = document.createElement('img');
-      imEl.loading = 'lazy';
-      imEl.decoding = 'async';
-      imEl.src = src;
-      imEl.alt = img.name;
-      imEl.addEventListener('load', () => imEl.classList.add('loaded'));
-      imEl.addEventListener('error', () => { wrap.style.display = 'none'; });
-      wrap.appendChild(imEl);
-    }
+    const imEl = document.createElement('img');
+    imEl.loading = 'lazy';
+    imEl.decoding = 'async';
+    imEl.src = src;
+    imEl.alt = img.name;
+    imEl.addEventListener('load', () => imEl.classList.add('loaded'));
+    imEl.addEventListener('error', () => { wrap.style.display = 'none'; });
+    wrap.appendChild(imEl);
 
     cell.appendChild(wrap);
 
@@ -930,6 +1792,884 @@ function formatDate(iso){
   return d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
 }
 
+// ---------- Live2D / Spine player ----------
+const l2dPlayer = document.getElementById('l2d-player');
+const l2dCanvas = document.getElementById('l2d-canvas');
+const l2dStatus = document.getElementById('l2d-status');
+const l2dDebugOverlay = document.getElementById('l2d-debug-overlay');
+const l2dDebugSeen = new Set();
+// Tracks which model.skelPath the player is currently meant to be
+// showing — unique per skeleton file, so it correctly distinguishes both
+// "switched to a different model folder" AND "switched skeleton variant
+// within the same folder" as staleness, letting an in-flight async load
+// for either case detect it's stale and bail out instead of clobbering
+// whatever's now open. Deliberately a separate variable from the
+// human-readable l2dPath display text, so this check can't be broken by a
+// future cosmetic change to how that text is formatted.
+let l2dActiveModelKey = null;
+function l2dDebugLog(msg){
+  if(l2dDebugSeen.has(msg)) return; // don't spam the same message every frame
+  l2dDebugSeen.add(msg);
+  const line = document.createElement('div');
+  line.textContent = msg;
+  l2dDebugOverlay.appendChild(line);
+}
+const l2dStage = document.getElementById('l2d-stage');
+const l2dPath = document.getElementById('l2d-path');
+const l2dVersion = document.getElementById('l2d-version');
+const l2dAnimGroups = document.getElementById('l2d-anim-groups');
+const l2dVariantGroup = document.getElementById('l2d-variant-group');
+const l2dGithub = document.getElementById('l2d-github');
+const l2dPlayToggle = document.getElementById('l2d-play-toggle');
+const l2dLoopToggle = document.getElementById('l2d-loop-toggle');
+const l2dNowPlayingName = document.getElementById('l2d-now-playing-name');
+const l2dModelName = document.getElementById('l2d-model-name');
+const l2dScrubber = document.getElementById('l2d-scrubber');
+const l2dSpeedGroup = document.getElementById('l2d-speed-group');
+const l2dResetCam = document.getElementById('l2d-reset-cam');
+const l2dTransportToggle = document.getElementById('l2d-transport-toggle');
+const l2dTransportPanel = document.getElementById('l2d-transport-panel');
+const l2dDrawer = document.getElementById('l2d-drawer');
+const l2dDrawerHandle = document.getElementById('l2d-drawer-handle');
+const l2dDrawerTitle = document.getElementById('l2d-drawer-title');
+const l2dDevInfoToggle = document.getElementById('l2d-dev-info-toggle');
+const l2dDevInfoBody = document.getElementById('l2d-dev-info-body');
+
+const runtimeLoadPromises = new Map(); // runtimeKey -> Promise
+let l2dActive = null; // { skeleton, state, animationState, renderer, ctx, gl, raf, resizeObs }
+
+// Best-effort human-readable labels for the developer's shorthand animation
+// names. Falls back to the raw name (shown as a small caption) when a
+// segment isn't recognized, so nothing is ever hidden — just clarified
+// where we can confidently guess.
+const ANIM_PREFIX_LABELS = {
+  b: 'Body', e: 'Expression', h: 'Reaction', t: 'Talk',
+};
+const ANIM_SUFFIX_LABELS = {
+  idle: 'Idle', diantou: 'Nod', ditou: 'Head down', liaofa: 'Hair touch',
+  mozhang: 'Rub palms', yangtou: 'Head up', yaotou: 'Shake head',
+  chijing: 'Surprised', haixiu: 'Shy', kaixin: 'Happy', nanguo: 'Sad',
+  shengqi: 'Angry', biyan: 'Eyes closed', bizui: 'Mouth closed',
+};
+function humanizeAnimName(name){
+  const m = name.match(/^([a-zA-Z]+)_(.+)$/);
+  if(!m) return null;
+  const [, prefix, suffix] = m;
+  const prefixLabel = ANIM_PREFIX_LABELS[prefix];
+  const suffixLabel = ANIM_SUFFIX_LABELS[suffix];
+  if(!prefixLabel && !suffixLabel) return null;
+  return `${prefixLabel || prefix}${suffixLabel ? ' · ' + suffixLabel : ''}`;
+}
+
+function l2dSetStatus(html){
+  l2dStatus.classList.remove('hidden');
+  l2dStatus.innerHTML = html;
+}
+function l2dHideStatus(){
+  l2dStatus.classList.add('hidden');
+}
+
+function loadScript(src){
+  return new Promise((resolve, reject) => {
+    const el = document.createElement('script');
+    el.src = src;
+    el.onload = () => resolve();
+    el.onerror = () => reject(new Error(`Failed to load ${src}`));
+    document.head.appendChild(el);
+  });
+}
+
+// Loads the spine-webgl runtime for a model. Prefers the EXACT patch version
+// the model was exported with (e.g. "4.2.36") over the loose minor
+// (e.g. "4.2"), because jsDelivr resolves a bare minor to whatever the
+// highest published patch happens to be *today* — which drifts over time
+// and can silently mismatch the binary .skel format the asset was actually
+// written with, even within the same minor version. A mismatched patch can
+// fail outright, or — worse — "succeed" while parsing skeleton/atlas data
+// slightly wrong, which shows up as broken UVs, misaligned regions, or seam
+// artifacts in the render. If the exact patch isn't available on the CDN,
+// we fall back to the loose minor rather than failing closed.
+//
+// Spine 3.6/3.7/3.8 are a separate case entirely: verified directly against
+// the npm registry (registry.npmjs.org/@esotericsoftware/spine-webgl) that
+// NO 3.x version was ever published there — the earliest published version
+// is 4.0.1. Those older runtimes were only ever distributed as plain built
+// JS files inside the spine-runtimes GitHub repo itself (e.g.
+// spine-ts/build/spine-webgl.js on the "3.8" branch), never as an npm
+// package. Fetching that file directly from raw.githubusercontent.com as a
+// <script src> does NOT work: that host serves it as
+// "Content-Type: text/plain" with "X-Content-Type-Options: nosniff" set
+// (verified directly), which per the Fetch spec's MIME-check causes every
+// modern browser to block a script-context request outright rather than
+// executing it — this is a different failure mode than a 404, and would
+// otherwise look like an unexplained silent failure. jsDelivr also mirrors
+// arbitrary GitHub repo files (not just npm packages) via
+// cdn.jsdelivr.net/gh/<owner>/<repo>@<ref>/<path>, serving them with a
+// correct JS content-type — so 3.x runtimes are loaded from there instead.
+// (Noted honestly: unlike the npm-registry and nosniff facts above, this
+// jsDelivr GitHub-mirror content-type behavior could not be directly
+// verified from this environment — jsdelivr.net isn't reachable from here.
+// The runtimeNS presence check a few lines below still catches it if wrong.)
+const LEGACY_SPINE_VERSIONS = new Set(['3.6', '3.7', '3.8']);
+function spineRuntimeScriptUrl(versionSpec){
+  if(LEGACY_SPINE_VERSIONS.has(versionSpec)){
+    return `https://cdn.jsdelivr.net/gh/EsotericSoftware/spine-runtimes@${versionSpec}/spine-ts/build/spine-webgl.js`;
+  }
+  return `https://cdn.jsdelivr.net/npm/@esotericsoftware/spine-webgl@${versionSpec}/dist/iife/spine-webgl.min.js`;
+}
+
+// The legacy 3.x builds (verified directly against the actual 3.8 branch
+// source: EsotericSoftware/spine-runtimes/3.8/spine-ts/build/spine-webgl.js)
+// nest the WebGL rendering-pipeline classes one level deeper than 4.x does:
+// GLTexture, SceneRenderer, and OrthoCamera live under spine.webgl.* there,
+// while 4.x exposes them flat on spine.* alongside everything else. Every
+// other class this file touches (TextureAtlas, AtlasAttachmentLoader,
+// SkeletonBinary, Skeleton, AnimationState, AnimationStateData, Vector2)
+// is flat on spine.* in both — confirmed by checking each name's actual
+// declaration site in the 3.8 source rather than assuming. Rather than
+// branch on version at every call site, alias the nested names onto the
+// top level once, right after load, so the rest of the code can keep
+// using spineNS.GLTexture / spineNS.SceneRenderer unconditionally.
+function normalizeSpineNamespace(spineNS){
+  if(!spineNS.GLTexture && spineNS.webgl && spineNS.webgl.GLTexture){
+    spineNS.GLTexture = spineNS.webgl.GLTexture;
+  }
+  if(!spineNS.SceneRenderer && spineNS.webgl && spineNS.webgl.SceneRenderer){
+    spineNS.SceneRenderer = spineNS.webgl.SceneRenderer;
+  }
+  if(!spineNS.OrthoCamera && spineNS.webgl && spineNS.webgl.OrthoCamera){
+    spineNS.OrthoCamera = spineNS.webgl.OrthoCamera;
+  }
+  return spineNS;
+}
+
+// Tracks which version string is currently loaded into the shared
+// window.spine global, so we can tell a genuine cache-hit (same version
+// requested again — reuse it) apart from a version switch (different
+// version requested — must clear first). This matters because every
+// spine-webgl build (3.x and 4.x alike) declares "var spine" as a plain
+// global and merges its class definitions into whatever object already
+// sits at window.spine rather than replacing it outright (confirmed by
+// reading the actual 3.8 build's UMD wrapper:
+// "(function(spine){...})(spine || (spine = {}))" — reuses an existing
+// object if one is present). Without an explicit clear, opening a 4.2
+// model and then a 3.8 model in the same session would merge both
+// versions' class definitions onto one object instead of cleanly
+// switching, which is exactly the kind of mismatch that produces subtle,
+// hard-to-trace rendering bugs rather than a clean failure.
+let loadedSpineVersion = null;
+
+function loadSpineRuntime(runtimeKey, exactVersion){
+  const cacheKey = exactVersion || runtimeKey;
+  // A cached promise is only safe to reuse if its version is STILL the one
+  // actually loaded into window.spine right now. Since window.spine is a
+  // single shared global (see loadedSpineVersion comment above), switching
+  // to a different version invalidates every other version's cached
+  // promise even though those promises already "resolved" — the object
+  // they resolved to no longer reflects what's live at window.spine.
+  if(runtimeLoadPromises.has(cacheKey) && loadedSpineVersion === cacheKey){
+    return runtimeLoadPromises.get(cacheKey);
+  }
+
+  async function tryLoad(versionSpec){
+    if(loadedSpineVersion !== null && loadedSpineVersion !== versionSpec){
+      delete window.spine;
+    }
+    const url = spineRuntimeScriptUrl(versionSpec);
+    await loadScript(url);
+    if(typeof window.spine === 'undefined'){
+      throw new Error('Runtime loaded but window.spine is missing');
+    }
+    loadedSpineVersion = versionSpec;
+    return normalizeSpineNamespace(window.spine);
+  }
+
+  const p = (async () => {
+    // The legacy 3.x branches only exist at the minor-version granularity
+    // (no per-patch npm releases to prefer), so there's no separate "exact
+    // patch" attempt to make for those — go straight to the branch build.
+    if(exactVersion && exactVersion !== runtimeKey && !LEGACY_SPINE_VERSIONS.has(runtimeKey)){
+      try{
+        return await tryLoad(exactVersion);
+      } catch(e){
+        console.warn(`spine-webgl@${exactVersion} unavailable, falling back to @${runtimeKey}`, e);
+        // A stale window.spine from the failed attempt should not linger.
+        delete window.spine;
+        loadedSpineVersion = null;
+      }
+    }
+    return await tryLoad(runtimeKey);
+  })();
+
+  runtimeLoadPromises.set(cacheKey, p);
+  return p;
+}
+
+// Drawer open/collapse. Collapsed shows just the handle tab; open reveals
+// the now-playing label, skeleton-variant switcher, animation list, and
+// dev info. Playback transport (play/pause, scrubber, speed, loop) lives
+// in its own separate floating panel — see setTransportOpen below — so it
+// doesn't compete with the drawer for space.
+function setDrawerOpen(open){
+  l2dDrawer.classList.toggle('open', open);
+  l2dDrawerHandle.setAttribute('aria-expanded', String(open));
+}
+l2dDrawerHandle.addEventListener('click', () => {
+  setDrawerOpen(!l2dDrawer.classList.contains('open'));
+});
+
+function setTransportOpen(open){
+  l2dTransportPanel.classList.toggle('open', open);
+  l2dTransportToggle.classList.toggle('active', open);
+}
+l2dTransportToggle.addEventListener('click', () => {
+  setTransportOpen(!l2dTransportPanel.classList.contains('open'));
+});
+
+l2dDevInfoToggle.addEventListener('click', () => {
+  const open = !l2dDevInfoBody.classList.contains('open');
+  l2dDevInfoBody.classList.toggle('open', open);
+  l2dDevInfoToggle.classList.toggle('open', open);
+});
+
+// Renders the skeleton-variant switcher (e.g. fight/room/ui rigs sharing
+// one model folder — see discoverLive2DModels) when a model has more than
+// one. Clicking a variant re-opens the player against a shallow copy of
+// the same model with skelPath swapped, reusing the entire existing
+// load/version-detect/render pipeline rather than a separate code path.
+function renderVariantSwitcher(model){
+  l2dVariantGroup.innerHTML = '';
+  if(!model.skelVariants || model.skelVariants.length <= 1) return;
+
+  const row = document.createElement('div');
+  row.className = 'l2d-anim-row';
+  model.skelVariants.forEach(variant => {
+    const btn = document.createElement('button');
+    btn.className = 'l2d-anim-btn' + (variant.path === model.skelPath ? ' active' : '');
+    btn.textContent = variant.label;
+    btn.addEventListener('click', () => {
+      if(variant.path === model.skelPath) return;
+      // detectModelVersion() caches its result ON the model object itself
+      // (checks model.versionStatus === 'detected' as a shortcut) and is
+      // keyed by model.skelPath internally, but the *shortcut check* isn't
+      // — so a plain shallow copy would inherit the OLD variant's
+      // 'detected' status and skip re-detecting the newly selected
+      // skeleton's actual version entirely. Explicitly reset the
+      // version-related fields so the copy looks unchecked, exactly like a
+      // freshly-discovered model would.
+      openLive2DPlayer(Object.assign({}, model, {
+        skelPath: variant.path,
+        version: null,
+        runtimeKey: undefined,
+        versionStatus: 'unknown'
+      }));
+    });
+    row.appendChild(btn);
+  });
+  l2dVariantGroup.appendChild(row);
+}
+
+async function openLive2DPlayer(model){
+  l2dActiveModelKey = model.skelPath;
+  l2dPath.textContent = model.folderPath;
+  l2dVersion.textContent = '…';
+  l2dAnimGroups.innerHTML = '';
+  l2dNowPlayingName.textContent = '—';
+  l2dDrawerTitle.textContent = model.name || 'Model details';
+  l2dModelName.textContent = model.name || 'Live2D model';
+  l2dGithub.href = BLOB_BASE + model.folderPath.split('/').map(encodeURIComponent).join('/');
+  l2dDebugSeen.clear();
+  l2dDebugOverlay.innerHTML = '';
+  l2dSetStatus(`<div class="spinner"></div><div>Detecting Spine version…</div>`);
+  l2dPlayer.classList.add('open');
+  document.body.classList.add('modal-open');
+  setDrawerOpen(false);
+  setTransportOpen(false);
+  l2dResetCam.classList.add('hidden');
+  renderVariantSwitcher(model);
+  teardownL2DActive();
+
+  await detectModelVersion(model);
+
+  if(model.versionStatus === 'failed'){
+    l2dVersion.textContent = 'unavailable';
+    l2dSetStatus(`Couldn't read this model's file header.<br><span style="opacity:0.7;font-size:12px">Try again, or view the texture sheet instead.</span>`);
+    return;
+  }
+  if(model.versionStatus === 'unsupported'){
+    l2dVersion.textContent = model.version || 'unrecognized';
+    l2dSetStatus(`This model uses Spine ${model.version || 'an unrecognized version'}, which isn't one of the runtimes bundled here.<br><span style="opacity:0.7;font-size:12px">Showing the texture sheet isn't available from this view — close and browse the folder instead.</span>`);
+    return;
+  }
+
+  l2dVersion.textContent = model.version;
+  l2dSetStatus(`<div class="spinner"></div><div>Loading Spine ${model.version || model.runtimeKey} runtime…</div>`);
+
+  let spineNS;
+  try{
+    spineNS = await loadSpineRuntime(model.runtimeKey, model.version);
+  } catch(e){
+    console.error(e);
+    l2dSetStatus(`Couldn't load the Spine ${model.runtimeKey} runtime.<br><span style="opacity:0.7;font-size:12px">Check your connection and try again.</span>`);
+    return;
+  }
+
+  // stale guard: if the user clicked another model or switched skeleton
+  // variant while this one was loading
+  if(!l2dPlayer.classList.contains('open') || l2dActiveModelKey !== model.skelPath) return;
+
+  l2dSetStatus(`<div class="spinner"></div><div>Loading model assets…</div>`);
+  try{
+    await renderSpineModel(spineNS, model);
+    l2dHideStatus();
+    l2dResetCam.classList.remove('hidden');
+    setDrawerOpen(true);
+  } catch(e){
+    console.error('Spine render failed for', model.folderPath, e);
+    l2dSetStatus(`This model failed to render.<br><span style="opacity:0.7;font-size:12px">${(e && e.message) ? e.message : 'Unknown error'}</span>`);
+  }
+}
+
+async function renderSpineModel(spineNS, model){
+  const canvas = l2dCanvas;
+  const dpr = window.devicePixelRatio || 1;
+
+  const resizeCanvasToContainer = () => {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+  };
+  resizeCanvasToContainer();
+  window.addEventListener('resize', resizeCanvasToContainer);
+
+  // stencil:true requested defensively; note that spine-webgl 4.2's actual
+  // clipping implementation (SkeletonClipping) does CPU-side polygon
+  // clipping/triangulation, not GPU stencil-buffer masking -- verified by
+  // reading SkeletonClipping.ts and SkeletonRenderer.ts source directly, no
+  // gl.STENCIL_TEST or stencil func calls anywhere in the runtime. So this
+  // is very unlikely to be what's causing the white face-shape artifacts,
+  // but it's a harmless, free thing to rule out.
+  const gl = canvas.getContext('webgl', { alpha: true, stencil: true }) || canvas.getContext('experimental-webgl', { alpha: true, stencil: true });
+  if(!gl) throw new Error('WebGL is not available in this browser.');
+
+  const skelUrl = RAW_BASE + model.skelPath.split('/').map(encodeURIComponent).join('/');
+  const atlasUrl = RAW_BASE + model.atlasPath.split('/').map(encodeURIComponent).join('/');
+  const atlasDir = model.atlasPath.substring(0, model.atlasPath.lastIndexOf('/') + 1);
+
+  const [skelRes, atlasText] = await Promise.all([
+    fetch(skelUrl).then(r => { if(!r.ok) throw new Error(`Failed to fetch skeleton (HTTP ${r.status})`); return r.arrayBuffer(); }),
+    fetch(atlasUrl).then(r => { if(!r.ok) throw new Error(`Failed to fetch atlas (HTTP ${r.status})`); return r.text(); })
+  ]);
+
+  // Load atlas pages (textures) referenced by the .atlas file.
+  //
+  // Verified empirically (sampled RGBA pixels along semi-transparent edges of
+  // a real exported atlas PNG from this asset source): several pixels have
+  // max(R,G,B) > A (e.g. RGBA 238,145,121,32) — only possible with STRAIGHT
+  // (non-premultiplied) alpha; premultiplied data can never have a color
+  // channel exceed its own alpha.
+  //
+  // drawSkeleton(skeleton, true) below uses spine-webgl's PREMULTIPLIED blend
+  // equation (ONE, ONE_MINUS_SRC_ALPHA). Straight-alpha texture data drawn
+  // with that equation and no compensating premultiply is exactly what
+  // produces a bright/white glow along anti-aliased edges (hair strands,
+  // jacket seams): at partial-alpha edge pixels the stored RGB is still
+  // full-brightness, but the blend math treats it as already darkened by its
+  // own alpha, so it over-contributes light there.
+  //
+  // Verified directly against spine-webgl 4.2's GLTexture.ts source
+  // (EsotericSoftware/spine-runtimes): GLTexture.update() only calls
+  // gl.pixelStorei(UNPACK_PREMULTIPLY_ALPHA_WEBGL, false) when
+  // DISABLE_UNPACK_PREMULTIPLIED_ALPHA_WEBGL is true — with the flag false
+  // (its default, kept below), update() never touches that pixel-store
+  // parameter at all, so it's left at the WebGL context's own default,
+  // which is FALSE (browsers do not premultiply on upload unless told to;
+  // see https://webglfundamentals.org/webgl/lessons/webgl-and-alpha.html).
+  // A prior version of this comment assumed GLTexture premultiplies
+  // automatically by default; that was never true, which is why the
+  // white-edge artifact persisted through that fix attempt. We now set the
+  // pixelStorei flag ourselves, immediately before each texture upload, so
+  // we don't depend on GLTexture's internal behavior in any given version.
+  spineNS.GLTexture.DISABLE_UNPACK_PREMULTIPLIED_ALPHA_WEBGL = false;
+
+  const textureLoader = (path) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        const tex = new spineNS.GLTexture(gl, img);
+        resolve(tex);
+      };
+      img.onerror = () => reject(new Error(`Failed to load texture: ${path}`));
+      img.src = RAW_BASE + (atlasDir + path).split('/').map(encodeURIComponent).join('/');
+    });
+  };
+
+  const atlasPages = parseAtlasPageNames(atlasText);
+  const textures = {};
+  await Promise.all(atlasPages.map(async pageName => {
+    textures[pageName] = await textureLoader(pageName);
+  }));
+
+  const atlas = new spineNS.TextureAtlas(atlasText);
+  atlas.pages.forEach(page => {
+    if(textures[page.name]) page.setTexture(textures[page.name]);
+  });
+
+  const atlasLoader = new spineNS.AtlasAttachmentLoader(atlas);
+  const skeletonBinary = new spineNS.SkeletonBinary(atlasLoader);
+
+  let skeletonData;
+  try {
+    skeletonData = skeletonBinary.readSkeletonData(new Uint8Array(skelRes));
+  } catch (err) {
+    console.error("Binary parse failed:", err);
+    throw new Error(`Incompatible Spine runtime version (${model.version || 'unknown'}). Failed to parse skeleton data.`);
+  }
+
+  // Spine 4.2+ requires updateWorldTransform() to receive a Physics enum
+  // argument (throws "physics is undefined" if called with none); older
+  // runtimes (<=4.1) don't have this enum and take no argument at all.
+  const updateWorldTransformCompat = (skeleton) => {
+    if (spineNS.Physics && spineNS.Physics.update !== undefined) {
+      skeleton.updateWorldTransform(spineNS.Physics.update);
+    } else {
+      skeleton.updateWorldTransform();
+    }
+  };
+
+  const skeleton = new spineNS.Skeleton(skeletonData);
+  skeleton.setToSetupPose();
+  updateWorldTransformCompat(skeleton);
+
+  const bounds = { offset: new spineNS.Vector2(), size: new spineNS.Vector2() };
+  skeleton.getBounds(bounds.offset, bounds.size, []);
+
+  const animState = new spineNS.AnimationState(new spineNS.AnimationStateData(skeletonData));
+  const animations = skeletonData.animations.map(a => a.name);
+  const defaultAnim = animations.find(n => /idle/i.test(n)) || animations[0];
+
+  const playback = { current: defaultAnim, loop: true, playing: true, speed: 1, track: null, scrubbing: false };
+  if(defaultAnim) l2dNowPlayingName.textContent = humanizeAnimName(defaultAnim) || defaultAnim;
+
+  function setAnimation(name){
+    playback.current = name;
+    playback.track = animState.setAnimation(0, name, playback.loop);
+    playback.track.timeScale = playback.speed;
+    l2dNowPlayingName.textContent = humanizeAnimName(name) || name;
+    const duration = playback.track.animationEnd - playback.track.animationStart;
+    l2dScrubber.disabled = !(duration > 0);
+  }
+  if(defaultAnim) setAnimation(defaultAnim);
+
+  const renderer = new spineNS.SceneRenderer(canvas, gl);
+
+  populateAnimButtons(animations, defaultAnim, (name) => {
+    setAnimation(name);
+    if(!playback.playing) setPlaying(true); // picking an animation implies resuming playback
+  });
+
+  const PLAY_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8V4z"/></svg>';
+  const PAUSE_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+
+  function setPlaying(playing){
+    playback.playing = playing;
+    l2dPlayToggle.innerHTML = playing ? PAUSE_ICON : PLAY_ICON;
+    l2dPlayToggle.classList.toggle('active', playing);
+    l2dPlayToggle.title = playing ? 'Pause' : 'Play';
+  }
+  setPlaying(true);
+
+  l2dPlayToggle.onclick = () => setPlaying(!playback.playing);
+
+  l2dLoopToggle.onclick = () => {
+    playback.loop = !playback.loop;
+    l2dLoopToggle.classList.toggle('active', playback.loop);
+    l2dLoopToggle.title = playback.loop ? 'Loop: on' : 'Loop: off';
+    if(playback.current) setAnimation(playback.current);
+  };
+
+  // Speed control: 0.5x / 1x / 2x via TrackEntry.timeScale, which scales
+  // just this track's animation playback (not physics/frame delta).
+  l2dSpeedGroup.querySelectorAll('.l2d-speed-btn').forEach(btn => {
+    btn.onclick = () => {
+      playback.speed = parseFloat(btn.dataset.speed);
+      if(playback.track) playback.track.timeScale = playback.speed;
+      l2dSpeedGroup.querySelectorAll('.l2d-speed-btn').forEach(b => b.classList.toggle('active', b === btn));
+    };
+  });
+  l2dSpeedGroup.querySelectorAll('.l2d-speed-btn').forEach(b => b.classList.toggle('active', parseFloat(b.dataset.speed) === 1));
+
+  // Timeline scrubber: drag to set TrackEntry.trackTime directly. While
+  // dragging, playback is paused (scrubbing) so the frame loop doesn't
+  // fight the user's input; released, it resumes from the scrubbed time.
+  l2dScrubber.value = 0;
+  l2dScrubber.addEventListener('pointerdown', () => { playback.scrubbing = true; });
+  l2dScrubber.addEventListener('input', () => {
+    if(!playback.track) return;
+    const duration = playback.track.animationEnd - playback.track.animationStart;
+    if(duration > 0){
+      playback.track.trackTime = (l2dScrubber.value / 1000) * duration;
+      animState.apply(skeleton);
+      updateWorldTransformCompat(skeleton);
+    }
+  });
+  const endScrub = () => { playback.scrubbing = false; };
+  l2dScrubber.addEventListener('pointerup', endScrub);
+  l2dScrubber.addEventListener('pointercancel', endScrub);
+
+  // ---- Camera: base "home" framing (contain-fit, computed once from the
+  // setup-pose bounds) plus a user-adjustable pan/zoom offset on top of it.
+  // Reset Camera clears the offset back to home; it never recomputes bounds
+  // from a mid-animation pose, so "home" stays stable regardless of what's
+  // currently playing.
+  const camPad = 1.15;
+  const boundsAspect = bounds.size.x / bounds.size.y;
+  const homeCenter = { x: bounds.offset.x + bounds.size.x / 2, y: bounds.offset.y + bounds.size.y / 2 };
+
+  const camView = { offsetX: 0, offsetY: 0, zoom: 1 };
+  function resetCamera(){
+    camView.offsetX = 0;
+    camView.offsetY = 0;
+    camView.zoom = 1;
+  }
+
+  l2dResetCam.onclick = resetCamera;
+
+  // Pointer-based pan (mouse drag or single-finger touch) and pinch-to-zoom
+  // (two-finger touch) directly on the stage. Wheel also zooms for desktop.
+  const pointers = new Map();
+  let pinchStartDist = 0;
+  let pinchStartZoom = 1;
+  let lastPanX = 0, lastPanY = 0;
+
+  function stagePxToWorld(px){
+    // Convert a screen-pixel delta to world-space delta at current zoom,
+    // using the canvas's current world-units-per-pixel scale.
+    const canvasAspect = canvas.width / canvas.height;
+    let viewH = bounds.size.y * camPad / camView.zoom;
+    let viewW = viewH * canvasAspect;
+    if (canvasAspect <= boundsAspect) {
+      viewW = bounds.size.x * camPad / camView.zoom;
+      viewH = viewW / canvasAspect;
+    }
+    return px * (viewW / canvas.clientWidth);
+  }
+
+  // Same "contain" fit math the render loop uses for viewW/viewH, but at
+  // zoom=1 (i.e. independent of the current zoom level) — needed so
+  // screenToWorld/zoomAround can compute a stable world position for a
+  // screen point regardless of what zoom is in effect when they're called.
+  function baseViewSize(){
+    const canvasAspect = canvas.width / canvas.height;
+    let viewW, viewH;
+    if (canvasAspect > boundsAspect) {
+      viewH = bounds.size.y * camPad;
+      viewW = viewH * canvasAspect;
+    } else {
+      viewW = bounds.size.x * camPad;
+      viewH = viewW / canvasAspect;
+    }
+    return { viewW, viewH };
+  }
+
+  // Screen (client) coords -> world coords, using the camera's current
+  // center and zoom. Mirrors exactly what the renderer does each frame
+  // (camera.position +/- half the current viewport size), so a point
+  // computed here lines up with what's actually drawn under that pixel.
+  function screenToWorld(clientX, clientY){
+    const rect = canvas.getBoundingClientRect();
+    const nx = (clientX - rect.left) / rect.width - 0.5;   // -0.5..0.5 across canvas
+    const ny = (clientY - rect.top) / rect.height - 0.5;
+    const { viewW, viewH } = baseViewSize();
+    const centerX = homeCenter.x + camView.offsetX;
+    const centerY = homeCenter.y + camView.offsetY;
+    return {
+      x: centerX + nx * (viewW / camView.zoom),
+      y: centerY - ny * (viewH / camView.zoom) // screen Y inverted vs world Y
+    };
+  }
+
+  // Change zoom while keeping the world point currently under (clientX,
+  // clientY) fixed under that same screen point — i.e. zoom "toward" that
+  // point instead of toward the fixed camera center. Without this, changing
+  // zoom alone (leaving offsetX/offsetY untouched) keeps the camera looking
+  // at the same world center while the visible span shrinks/grows around
+  // it, so whatever is under your fingers/cursor visibly drifts away as you
+  // zoom — which was the reported bug.
+  function zoomAround(clientX, clientY, newZoom){
+    newZoom = Math.min(8, Math.max(0.2, newZoom));
+    const before = screenToWorld(clientX, clientY);
+    camView.zoom = newZoom;
+    const after = screenToWorld(clientX, clientY);
+    camView.offsetX += before.x - after.x;
+    camView.offsetY += before.y - after.y;
+  }
+
+  l2dStage.addEventListener('pointerdown', (e) => {
+    if(e.target.closest('#l2d-status')) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    l2dStage.setPointerCapture(e.pointerId);
+    if(pointers.size === 1){
+      l2dStage.classList.add('panning');
+      lastPanX = e.clientX; lastPanY = e.clientY;
+    } else if(pointers.size === 2){
+      const pts = [...pointers.values()];
+      pinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      pinchStartZoom = camView.zoom;
+    }
+  });
+  l2dStage.addEventListener('pointermove', (e) => {
+    if(!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if(pointers.size === 1){
+      const dx = e.clientX - lastPanX;
+      const dy = e.clientY - lastPanY;
+      lastPanX = e.clientX; lastPanY = e.clientY;
+      camView.offsetX -= stagePxToWorld(dx);
+      camView.offsetY += stagePxToWorld(dy); // screen Y is inverted vs world Y
+    } else if(pointers.size === 2){
+      const pts = [...pointers.values()];
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      const midX = (pts[0].x + pts[1].x) / 2;
+      const midY = (pts[0].y + pts[1].y) / 2;
+      if(pinchStartDist > 0){
+        zoomAround(midX, midY, pinchStartZoom * (dist / pinchStartDist));
+      }
+    }
+  });
+  function releasePointer(e){
+    pointers.delete(e.pointerId);
+    if(pointers.size === 0) l2dStage.classList.remove('panning');
+    if(pointers.size < 2) pinchStartDist = 0;
+    if(pointers.size === 1){
+      // Pinch (2 fingers) just dropped to a single remaining finger. Without
+      // this, lastPanX/lastPanY are still whatever they were from the last
+      // 1-finger state (stale — possibly from before the pinch even
+      // started), so the next pointermove computes dx/dy against a stale
+      // reference point instead of the remaining finger's actual position,
+      // producing one large spurious pan jump right as the lifted finger
+      // releases. Resync to the remaining finger's current position so
+      // panning continues smoothly from here with no jump.
+      const [remaining] = pointers.values();
+      lastPanX = remaining.x;
+      lastPanY = remaining.y;
+      l2dStage.classList.add('panning');
+    }
+  }
+  l2dStage.addEventListener('pointerup', releasePointer);
+  l2dStage.addEventListener('pointercancel', releasePointer);
+  l2dStage.addEventListener('pointerleave', releasePointer);
+
+  l2dStage.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    zoomAround(e.clientX, e.clientY, camView.zoom * factor);
+  }, { passive: false });
+
+  let lastTime = Date.now() / 1000;
+  function frame(){
+    const now = Date.now() / 1000;
+    const delta = now - lastTime;
+    lastTime = now;
+
+    try {
+      if(playback.playing && !playback.scrubbing){
+        animState.update(delta);
+      }
+      animState.apply(skeleton);
+
+      // Spine 4.2+ requires skeleton.update(delta) to advance physics timing
+      if (typeof skeleton.update === 'function') {
+        skeleton.update((playback.playing && !playback.scrubbing) ? delta : 0);
+      }
+
+      updateWorldTransformCompat(skeleton);
+    } catch(e) {
+      console.warn("Animation update frame error:", e);
+      l2dDebugLog(`update: ${e && e.message ? e.message : e}`);
+    }
+
+    // Keep the scrubber in sync with playback, but don't fight the user
+    // while they're actively dragging it.
+    if(playback.track && !playback.scrubbing){
+      const duration = playback.track.animationEnd - playback.track.animationStart;
+      if(duration > 0){
+        const t = ((playback.track.trackTime % duration) / duration) * 1000;
+        l2dScrubber.value = t;
+      }
+    }
+
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    // Fit the skeleton's bounds into the canvas's actual aspect ratio
+    // ("contain" behavior), then apply the user's pan/zoom on top.
+    const canvasAspect = canvas.width / canvas.height;
+    let viewW, viewH;
+    if (canvasAspect > boundsAspect) {
+      viewH = bounds.size.y * camPad;
+      viewW = viewH * canvasAspect;
+    } else {
+      viewW = bounds.size.x * camPad;
+      viewH = viewW / canvasAspect;
+    }
+
+    renderer.camera.position.x = homeCenter.x + camView.offsetX;
+    renderer.camera.position.y = homeCenter.y + camView.offsetY;
+    renderer.camera.viewportWidth = viewW / camView.zoom;
+    renderer.camera.viewportHeight = viewH / camView.zoom;
+
+    try {
+      renderer.begin();
+      renderer.drawSkeleton(skeleton, true);
+      renderer.end();
+    } catch(e) {
+      console.warn("Draw error:", e);
+      l2dDebugLog(`draw: ${e && e.message ? e.message : e}`);
+    }
+
+    const glErr = gl.getError();
+    if(glErr !== gl.NO_ERROR){
+      l2dDebugLog(`gl error: 0x${glErr.toString(16)}`);
+    }
+
+    if (l2dActive) {
+      l2dActive.raf = requestAnimationFrame(frame);
+    }
+  }
+
+  l2dActive = { renderer, gl, skeleton, animState, raf: null, resizeCanvasToContainer, cleanupResize: () => window.removeEventListener('resize', resizeCanvasToContainer) };
+  frame();
+}
+
+// Extracts page (texture) file names from a Spine .atlas text file.
+// Atlas format: page name is a line with no ":" that precedes lines like
+// "size:", "format:", "filter:", "repeat:" — a simple, well-documented
+// plain-text format (not proprietary), so this is a straightforward parse.
+function parseAtlasPageNames(atlasText){
+  const lines = atlasText.split(/\r?\n/);
+  const pages = [];
+  for(let i = 0; i < lines.length; i++){
+    const line = lines[i].trim();
+    if(line === '') continue;
+    const next = (lines[i+1] || '').trim();
+    if(next.startsWith('size:')){
+      pages.push(line);
+    }
+  }
+  return pages;
+}
+
+function populateAnimButtons(names, activeName, onSelect){
+  l2dAnimGroups.innerHTML = '';
+  if(!names || names.length === 0) return;
+
+  // Group by naming prefix convention (e.g. "b_idle" -> group "b").
+  // Anything without a recognized "x_" prefix falls into "Other".
+  const groups = new Map();
+  names.forEach(name => {
+    const m = name.match(/^([a-zA-Z]+)_/);
+    const key = m ? m[1] : 'other';
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(name);
+  });
+
+  const setActiveButton = (name) => {
+    l2dAnimGroups.querySelectorAll('.l2d-anim-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.animName === name);
+    });
+  };
+
+  groups.forEach((groupNames, key) => {
+    const groupEl = document.createElement('div');
+    groupEl.className = 'l2d-anim-group';
+
+    if(groups.size > 1){
+      const label = document.createElement('div');
+      label.className = 'l2d-anim-group-label';
+      label.textContent = ANIM_PREFIX_LABELS[key] || key;
+      groupEl.appendChild(label);
+    }
+
+    const row = document.createElement('div');
+    row.className = 'l2d-anim-row';
+    groupNames.forEach(name => {
+      const btn = document.createElement('button');
+      btn.className = 'l2d-anim-btn' + (name === activeName ? ' active' : '');
+      btn.dataset.animName = name;
+
+      const human = humanizeAnimName(name);
+      if(human){
+        btn.innerHTML = `${human}<span class="l2d-anim-raw">${name}</span>`;
+      } else {
+        btn.textContent = name;
+      }
+
+      btn.addEventListener('click', () => {
+        setActiveButton(name);
+        onSelect(name);
+      });
+      row.appendChild(btn);
+    });
+    groupEl.appendChild(row);
+    l2dAnimGroups.appendChild(groupEl);
+  });
+
+  setActiveButton(activeName);
+}
+
+function teardownL2DActive(){
+  if(l2dActive){
+    if(l2dActive.raf) cancelAnimationFrame(l2dActive.raf);
+    if(l2dActive.cleanupResize) l2dActive.cleanupResize();
+    l2dActive = null;
+  }
+}
+
+function closeLive2DPlayer(){
+  l2dPlayer.classList.remove('open');
+  document.body.classList.remove('modal-open');
+  setDrawerOpen(false);
+  teardownL2DActive();
+}
+
+document.getElementById('l2d-close').addEventListener('click', closeLive2DPlayer);
+l2dPlayer.addEventListener('click', e => { if(e.target === l2dPlayer) closeLive2DPlayer(); });
+
+// Lightweight keyboard shortcuts make the viewer feel like a proper media
+// lightbox without stealing keys from text inputs.
+document.addEventListener('keydown', (e) => {
+  if(!l2dPlayer.classList.contains('open')) return;
+  const tag = e.target?.tagName;
+  if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target?.isContentEditable) return;
+
+  if(e.key === 'Escape'){
+    e.preventDefault();
+    closeLive2DPlayer();
+    return;
+  }
+  if(e.key.toLowerCase() === 'r' && !l2dResetCam.classList.contains('hidden')){
+    e.preventDefault();
+    l2dResetCam.click();
+    return;
+  }
+  if(e.code === 'Space'){
+    e.preventDefault();
+    l2dPlayToggle.click();
+  }
+});
+
+l2dDrawerHandle.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter' || e.key === ' '){
+    e.preventDefault();
+    l2dDrawerHandle.click();
+  }
+});
+
 async function openLightbox(img){
   currentLightboxImg = img;
   
@@ -937,25 +2677,13 @@ async function openLightbox(img){
   lbMedia.innerHTML = '';
   lbDims.textContent = '…';
 
-  if(img.isVideo){
-    const vEl = document.createElement('video');
-    vEl.src = rawUrl;
-    vEl.controls = true;
-    vEl.autoplay = true;
-    vEl.playsInline = true;
-    vEl.addEventListener('loadedmetadata', () => {
-      lbDims.textContent = `${vEl.videoWidth} × ${vEl.videoHeight}`;
-    });
-    lbMedia.appendChild(vEl);
-  } else {
-    const imEl = document.createElement('img');
-    imEl.src = rawUrl;
-    imEl.alt = img.name;
-    imEl.addEventListener('load', () => {
-      lbDims.textContent = `${imEl.naturalWidth} × ${imEl.naturalHeight}`;
-    });
-    lbMedia.appendChild(imEl);
-  }
+  const imEl = document.createElement('img');
+  imEl.src = rawUrl;
+  imEl.alt = img.name;
+  imEl.addEventListener('load', () => {
+    lbDims.textContent = `${imEl.naturalWidth} × ${imEl.naturalHeight}`;
+  });
+  lbMedia.appendChild(imEl);
 
   lbPath.textContent = img.path;
   lbGithub.href = BLOB_BASE + img.path.split('/').map(encodeURIComponent).join('/');
