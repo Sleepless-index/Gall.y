@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gall.y</title>
+<title>Gall.y — Merged</title>
 <style>
   :root {
     --bg: #0b0b0f;
@@ -482,8 +482,8 @@
     width: 30px; height: 30px; border: 3px solid rgba(255,255,255,.1);
     border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite;
   }
-  #cubism-player { position: fixed; inset: 0; z-index: 10000; display: none; visibility: hidden; opacity: 0; pointer-events: none; background: #07070b; animation: l2dFadeIn 0.22s ease; overflow: hidden; }
-  #cubism-player.open { display: block !important; visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; }
+  #cubism-player { position: fixed; inset: 0; z-index: 100; display: none; background: #07070b; animation: l2dFadeIn 0.22s ease; overflow: hidden; }
+  #cubism-player.open { display: block; }
   #cubism-transport-toggle { position: static; z-index: auto; }
   #cubism-transport-panel {
     position: fixed; top: 76px; left: 16px; z-index: 111;
@@ -877,7 +877,24 @@
 </style>
 </head>
 <body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
+<script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<script>
+/*
+ * Merged-runtime compatibility layer.
+ * The native Cubism Framework player remains the authoritative renderer.
+ * These globals are only recorded for diagnostics/fallback awareness.
+ */
+window.GallyMergedRuntime = Object.freeze({
+  pixiAvailable: typeof window.PIXI !== 'undefined',
+  cubismCoreAvailable: typeof window.Live2DCubismCore !== 'undefined',
+  nativeCubismPlayer: true
+});
+</script>
+
 
 <div id="sb-overlay"></div>
 
@@ -2116,17 +2133,7 @@ function renderCubismCard(model){
   nameEl.textContent = model.name;
   cell.appendChild(nameEl);
 
-  // Open the viewer synchronously before any async runtime/model loading.
-  // This guarantees the modal itself is visible even if Cubism/WebGL loading fails.
-  cell.addEventListener('click', (e) => {
-    e.preventDefault();
-    cubismPlayer.classList.add('open');
-    cubismPlayer.style.display = 'block';
-    cubismPlayer.style.visibility = 'visible';
-    cubismPlayer.style.opacity = '1';
-    cubismPlayer.style.pointerEvents = 'auto';
-    openCubismPlayer(model);
-  });
+  cell.addEventListener('click', () => openCubismPlayer(model));
   return cell;
 }
 
@@ -3374,10 +3381,6 @@ function teardownCubismActive(){
 
 function closeCubismPlayer(){
   cubismPlayer.classList.remove('open');
-  cubismPlayer.style.display = '';
-  cubismPlayer.style.visibility = '';
-  cubismPlayer.style.opacity = '';
-  cubismPlayer.style.pointerEvents = '';
   document.body.classList.remove('modal-open');
   setCubismDrawerOpen(false);
   teardownCubismActive();
@@ -3465,12 +3468,6 @@ function setCubismExpression(name){
 }
 
 async function openCubismPlayer(model){
-  // The modal is opened before awaiting runtime/network work.
-  cubismPlayer.classList.add('open');
-  cubismPlayer.style.display = 'block';
-  cubismPlayer.style.visibility = 'visible';
-  cubismPlayer.style.opacity = '1';
-  cubismPlayer.style.pointerEvents = 'auto';
   cubismActiveModelKey = model.key;
   cubismPath.textContent = model.folderPath;
   cubismModelName.textContent = model.name;
