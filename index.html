@@ -907,7 +907,7 @@ window.GallyMergedRuntime = Object.freeze({
   <div class="sb-header">
     <div class="sb-header-top">
       <div class="sb-title">Gall<span>.</span>y</div>
-      <button id="download-folder-btn" type="button" title="Download folder (.zip)">
+      <button id="download-folder-btn" title="Download folder (.zip)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Zip Folder
       </button>
@@ -922,7 +922,7 @@ window.GallyMergedRuntime = Object.freeze({
   </div>
 </aside>
 
-<button id="sb-toggle" type="button" aria-label="Toggle folders" aria-expanded="false">
+<button id="sb-toggle" aria-label="Toggle folders">
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path></svg>
 </button>
 
@@ -3610,17 +3610,10 @@ function ensureCubismFrameworkStarted(framework){
 }
 
 async function renderCubismModel(framework, model){
-  // ── Strategy A: Try pixi-live2d-display (bundles its own Core+Framework) ──
-  const Live2DModel = window.Live2DModel || window.PIXI?.live2d?.Live2DModel;
-  console.log('[Cubism] pixi-live2d-display Live2DModel available?', typeof Live2DModel);
-
-  if(typeof Live2DModel !== 'undefined' && Live2DModel.from) {
-    console.log('[Cubism] Using pixi-live2d-display strategy');
-    return await renderCubismViaPixi(model, Live2DModel);
-  }
-
-  // ── Strategy B: Fallback to custom framework ──
-  console.log('[Cubism] pixi-live2d-display not available, falling back to custom framework');
+  // Use the explicitly loaded Core + bundled Framework as the single runtime
+  // pair. pixi-live2d-display is not loaded by this page, so do not silently
+  // switch runtimes or introduce a second Core/Framework pair.
+  console.log('[Cubism] Using native Cubism Core + bundled Framework');
   return await renderCubismViaFramework(framework, model);
 }
 
@@ -3901,29 +3894,51 @@ async function renderCubismViaFramework(framework, model) {
     console.error('[Cubism] GLOBAL Core Moc test:', 'FAIL -', e.message);
   }
 
-  // CubismUserModel.loadModel() is not a public Core loader. The framework
-  // method expects the model buffer as its first parameter, so passing an
-  // extra size argument does not repair a Core/framework mismatch and can
-  // shift the framework's internal arguments. Use the framework's documented
-  // one-buffer path first.
+  const _originalLoadModel = cubismModel.loadModel;
+  cubismModel.loadModel = function(...args) {
+    console.log('[Cubism] loadModel called with', args.length, 'args:');
+    args.forEach((a, i) => console.log(`  arg[${i}]:`, typeof a, a?.constructor?.name, 'byteLength=', a?.byteLength));
+    try {
+      return _originalLoadModel.apply(this, args);
+    } catch(e) {
+      console.error('[Cubism] loadModel THREW:', e.name, e.message);
+      throw e;
+    }
+  };
+
+  let loadSuccess = false;
+  const loadAttempts = [];
+
+  // CubismUserModel.loadModel() expects the MOC buffer as its first argument.
+  // Its optional second argument is the boolean consistency-check flag — NOT
+  // the buffer byte length. Passing byteLength here can silently turn into
+  // `true` and, more importantly, obscures the actual Framework/Core failure.
+  // Keep the Framework path strict: one ArrayBuffer, one API contract.
   try {
-    cubismModel.loadModel(mocBuffer);
+    cubismModel.loadModel(mocBuffer, false);
+    console.log('[Cubism] Framework loadModel succeeded:', bufferInfo(mocBuffer));
+    loadSuccess = true;
   } catch(err) {
-    throw new Error(
-      `Cubism framework rejected the MOC buffer: ${err.message}. ` +
-      `The Core itself can read this MOC, so the failure is inside the bundled framework/runtime pair.`
-    );
+    loadAttempts.push({ sig: 'ArrayBuffer,false', error: err.message });
+    console.error('[Cubism] Framework loadModel failed:', err.message);
   }
 
-  const loadedCoreModel = typeof cubismModel.getModel === 'function'
-    ? cubismModel.getModel()
-    : cubismModel._model;
-
-  if(!loadedCoreModel) {
-    throw new Error(
-      'Cubism framework loadModel() returned without creating a model. ' +
-      'The bundled cubism-framework.js does not match the runtime API expected by this page.'
-    );
+  if(!loadSuccess) {
+    const coreVer = window.Live2DCubismCore?.Version;
+    const coreVerStr = coreVer ? `${coreVer.major || '?'}.${coreVer.minor || '?'}.${coreVer.patch || '?'}` : 'unknown';
+    const attemptSummary = loadAttempts.map(a => `  ${a.sig}: ${a.error}`).join('\n');
+    const diagMsg =
+      `Cubism model loading failed.\n\n` +
+      `Core version: ${coreVerStr}\n` +
+      `Global Core Moc test: ${globalCoreMoc ? 'PASS' : 'FAIL'}\n` +
+      `Framework call: CubismUserModel.loadModel(ArrayBuffer, false)\n` +
+      `Attempts:\n${attemptSummary}\n\n` +
+      (globalCoreMoc
+        ? `The Core accepted this MOC, so the binary itself is readable by the loaded Core. ` +
+          `The remaining failure is in the Framework load path or its Core/Framework pairing.`
+        : `The Core could not create a Moc from this buffer, so inspect the MOC asset, fetch response, and Core version first.`);
+    console.error('[Cubism] FINAL ERROR:', diagMsg);
+    throw new Error(diagMsg);
   }
 
   cubismModel.createRenderer(canvas.width, canvas.height);
@@ -4049,22 +4064,6 @@ async function renderCubismViaFramework(framework, model) {
   cubismPlayToggle.classList.add('active');
   cubismActive.raf = requestAnimationFrame(frame);
 }
-
-// ---------- Sidebar controls ----------
-function setSidebarOpen(open){
-  sidebar.classList.toggle('open', open);
-  sbOverlay.classList.toggle('open', open);
-  sbToggle.setAttribute('aria-expanded', String(open));
-}
-if(sbToggle){
-  sbToggle.addEventListener('click', () => setSidebarOpen(!sidebar.classList.contains('open')));
-}
-if(sbOverlay){
-  sbOverlay.addEventListener('click', () => setSidebarOpen(false));
-}
-window.addEventListener('keydown', (e) => {
-  if(e.key === 'Escape') setSidebarOpen(false);
-});
 
 init(false);
 </script>
