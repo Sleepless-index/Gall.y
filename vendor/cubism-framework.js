@@ -6275,7 +6275,28 @@ var CubismMoc = class _CubismMoc {
     const moc = Live2DCubismCore.Moc.fromArrayBuffer(mocBytes);
     if (moc) {
       cubismMoc = new _CubismMoc(moc);
-      cubismMoc._mocVersion = Live2DCubismCore.Version.csmGetMocVersion(mocBytes);
+      // Cubism Core changed the JavaScript signature of csmGetMocVersion.
+      // Newer Cores use: csmGetMocVersion(mocBytes)
+      // Older Cores use: csmGetMocVersion(moc, mocBytes)
+      // The rest of the Framework is compatible with both, so bridge the
+      // signature here instead of letting the old Core receive `undefined`
+      // as its MOC byte buffer and throw "reading 'byteLength'".
+      const getMocVersion = Live2DCubismCore?.Version?.csmGetMocVersion;
+      let mocVersion = 0;
+      if (typeof getMocVersion === 'function') {
+        try {
+          mocVersion = getMocVersion(mocBytes);
+        } catch (newSignatureError) {
+          try {
+            mocVersion = getMocVersion(moc, mocBytes);
+          } catch (legacySignatureError) {
+            // Version metadata is diagnostic only; a valid Moc object is still
+            // usable, so do not reject an otherwise loadable model here.
+            mocVersion = 0;
+          }
+        }
+      }
+      cubismMoc._mocVersion = mocVersion;
     }
     return cubismMoc;
   }
@@ -6342,7 +6363,18 @@ var CubismMoc = class _CubismMoc {
    * @returns .moc3 Version番号
    */
   static getMocVersionFromBuffer(mocBytes) {
-    return Live2DCubismCore.Version.csmGetMocVersion(mocBytes);
+    const getMocVersion = Live2DCubismCore?.Version?.csmGetMocVersion;
+    if (typeof getMocVersion !== 'function') {
+      return 0;
+    }
+    try {
+      return getMocVersion(mocBytes);
+    } catch (newSignatureError) {
+      // Legacy Core signature: csmGetMocVersion(moc, mocBytes).
+      // This helper has no live Moc object, so there is no safe legacy call.
+      // Return unknown rather than surfacing the misleading byteLength error.
+      return 0;
+    }
   }
   /**
    * .moc3 の整合性を検証する
