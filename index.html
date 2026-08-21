@@ -3107,6 +3107,7 @@ async function renderSpineModel(spineNS, model){
       }
     }
 
+    renderer.setRenderTargetSize?.(canvas.width, canvas.height);
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -3552,9 +3553,15 @@ async function renderCubismModel(framework, model){
   });
   cubismModel.loadModel(mocBuffer);
 
-  cubismModel.createRenderer();
+  // Create the WebGL renderer with the actual backing-buffer dimensions.
+  // Passing no dimensions can leave the renderer's render target at an
+  // invalid/zero size on some Cubism WebGL builds, resulting in a perfectly
+  // healthy animation loop that draws nothing.
+  cubismModel.createRenderer(canvas.width, canvas.height);
   const renderer = cubismModel.getRenderer();
+  if(!renderer) throw new Error('Cubism renderer failed to initialize.');
   renderer.startUp(gl);
+  renderer.setRenderTargetSize?.(canvas.width, canvas.height);
   renderer.setIsPremultipliedAlpha(true);
 
   // Textures: fetched as plain <img> elements and bound the same way the
@@ -3694,6 +3701,7 @@ async function renderCubismModel(framework, model){
       cubismModel.getModel && cubismModel.update?.(dt);
     }
 
+    renderer.setRenderTargetSize?.(canvas.width, canvas.height);
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
