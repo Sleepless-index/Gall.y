@@ -3933,7 +3933,15 @@ async function renderCubismViaFramework(framework, model) {
 
   if(!loadSuccess) {
     const coreVer = window.Live2DCubismCore?.Version;
-    const coreVerStr = coreVer ? `${coreVer.major || '?'}.${coreVer.minor || '?'}.${coreVer.patch || '?'}` : 'unknown';
+    let coreVerStr = 'unknown';
+    try {
+      const packedVersion = coreVer?.csmGetVersion?.();
+      coreVerStr = typeof packedVersion === 'number'
+        ? `0x${packedVersion.toString(16).padStart(8, '0')} (csmGetVersion)`
+        : (coreVer ? 'available' : 'unknown');
+    } catch (_) {
+      coreVerStr = coreVer ? 'available' : 'unknown';
+    }
     const attemptSummary = loadAttempts.map(a => `  ${a.sig}: ${a.error}`).join('\n');
     const diagMsg =
       `Cubism model loading failed.\n\n` +
