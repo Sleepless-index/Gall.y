@@ -3884,14 +3884,22 @@ async function renderCubismViaFramework(framework, model) {
     console.log('[Cubism] loadModel source:', cubismModel.loadModel.toString().slice(0, 300));
   }
 
+  // IMPORTANT: never probe the loaded Core with the SAME ArrayBuffer that will
+  // be handed to the Framework. Some Core builds may retain/consume the passed
+  // buffer internally, so the diagnostic probe must use its own copy.
+  // This keeps the Framework's input untouched and removes the probe itself as
+  // a possible cause of the subsequent load failure.
   let globalCoreMoc = null;
   try {
     if(window.Live2DCubismCore?.Moc?.fromArrayBuffer) {
-      globalCoreMoc = window.Live2DCubismCore.Moc.fromArrayBuffer(mocBuffer);
-      console.log('[Cubism] GLOBAL Core Moc test:', globalCoreMoc ? 'PASS' : 'FAIL (returned null)');
+      const mocProbeBuffer = mocBuffer.slice(0);
+      globalCoreMoc = window.Live2DCubismCore.Moc.fromArrayBuffer(mocProbeBuffer);
+      console.log('[Cubism] GLOBAL Core Moc probe:', globalCoreMoc ? 'PASS' : 'FAIL (returned null)',
+        'probeBytes=', mocProbeBuffer.byteLength,
+        'frameworkBytes=', mocBuffer.byteLength);
     }
   } catch(e) {
-    console.error('[Cubism] GLOBAL Core Moc test:', 'FAIL -', e.message);
+    console.error('[Cubism] GLOBAL Core Moc probe:', 'FAIL -', e.message);
   }
 
   const _originalLoadModel = cubismModel.loadModel;
@@ -3930,11 +3938,11 @@ async function renderCubismViaFramework(framework, model) {
     const diagMsg =
       `Cubism model loading failed.\n\n` +
       `Core version: ${coreVerStr}\n` +
-      `Global Core Moc test: ${globalCoreMoc ? 'PASS' : 'FAIL'}\n` +
+      `Global Core Moc probe: ${globalCoreMoc ? 'PASS' : 'FAIL'}\n` +
       `Framework call: CubismUserModel.loadModel(ArrayBuffer, false)\n` +
       `Attempts:\n${attemptSummary}\n\n` +
       (globalCoreMoc
-        ? `The Core accepted this MOC, so the binary itself is readable by the loaded Core. ` +
+        ? `The Core probe accepted an independent copy of this MOC, so the binary itself is readable by the loaded Core. ` +
           `The remaining failure is in the Framework load path or its Core/Framework pairing.`
         : `The Core could not create a Moc from this buffer, so inspect the MOC asset, fetch response, and Core version first.`);
     console.error('[Cubism] FINAL ERROR:', diagMsg);
