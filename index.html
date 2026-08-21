@@ -1307,9 +1307,15 @@ async function discoverCubismModels(tree){
       const folderName = folderPath.split('/').pop();
       try{
         const manifestUrl = RAW_BASE + modelJsonPath.split('/').map(encodeURIComponent).join('/');
-        const manifest = await fetch(manifestUrl).then(r => {
+        const manifest = await fetch(manifestUrl).then(async r => {
           if(!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.json();
+          const text = await r.text();
+          if(!text.trim()) throw new Error('Empty model3.json response');
+          try {
+            return JSON.parse(text);
+          } catch(err) {
+            throw new Error(`Invalid model3.json JSON: ${err.message}`);
+          }
         });
         const refs = manifest.FileReferences || {};
         if(!refs.Moc) return; // not a usable model without a .moc3 reference
@@ -3523,9 +3529,16 @@ async function renderCubismModel(framework, model){
   // fresh, matching how the manual describes ICubismModelSetting being
   // read at load time rather than cached model-side.
   const manifestUrl = RAW_BASE + model.modelJsonPath.split('/').map(encodeURIComponent).join('/');
-  const manifestText = await fetch(manifestUrl).then(r => {
+  const manifestText = await fetch(manifestUrl).then(async r => {
     if(!r.ok) throw new Error(`Failed to fetch model3.json (HTTP ${r.status})`);
-    return r.text();
+    const text = await r.text();
+    if(!text.trim()) throw new Error(`model3.json is empty: ${model.modelJsonPath}`);
+    try {
+      JSON.parse(text); // Validate before handing it to the Cubism parser.
+    } catch(err) {
+      throw new Error(`Invalid model3.json for ${model.name}: ${err.message}`);
+    }
+    return text;
   });
   const manifestBytes = new TextEncoder().encode(manifestText);
   const setting = new framework.CubismModelSettingJson(manifestBytes.buffer, manifestBytes.byteLength);
@@ -3584,16 +3597,29 @@ async function renderCubismModel(framework, model){
   for(const [groupName, motions] of Object.entries(model.motionGroups)){
     for(const motion of motions){
       const url = RAW_BASE + motion.path.split('/').map(encodeURIComponent).join('/');
-      const text = await fetch(url).then(r => r.text());
-      const m = cubismModel.loadMotion(text, text.length, `${groupName}_${motion.name}`);
+      const buffer = await fetch(url).then(async r => {
+        if(!r.ok) throw new Error(`Failed to fetch motion ${motion.path} (HTTP ${r.status})`);
+        const data = await r.arrayBuffer();
+        if(!data.byteLength) throw new Error(`Motion file is empty: ${motion.path}`);
+        return data;
+      });
+      // CubismUserModel.loadMotion() expects the raw JSON as an ArrayBuffer.
+      // Passing response.text() here can make the framework's JSON parser see
+      // an incomplete/invalid buffer and produce "Unexpected end of JSON input".
+      const m = cubismModel.loadMotion(buffer, buffer.byteLength, `${groupName}_${motion.name}`);
       loadedMotions[`${groupName}::${motion.name}`] = m;
     }
   }
 
   for(const expr of model.expressionPaths){
     const url = RAW_BASE + expr.path.split('/').map(encodeURIComponent).join('/');
-    const text = await fetch(url).then(r => r.text());
-    cubismModel.loadExpression(text, text.length, expr.name);
+    const buffer = await fetch(url).then(async r => {
+      if(!r.ok) throw new Error(`Failed to fetch expression ${expr.path} (HTTP ${r.status})`);
+      const data = await r.arrayBuffer();
+      if(!data.byteLength) throw new Error(`Expression file is empty: ${expr.path}`);
+      return data;
+    });
+    cubismModel.loadExpression(buffer, buffer.byteLength, expr.name);
   }
 
   cubismModel.startMotion = (groupName, index, priority) => {
