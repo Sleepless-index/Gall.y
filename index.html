@@ -482,8 +482,8 @@
     width: 30px; height: 30px; border: 3px solid rgba(255,255,255,.1);
     border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite;
   }
-  #cubism-player { position: fixed; inset: 0; z-index: 100; display: none; background: #07070b; animation: l2dFadeIn 0.22s ease; overflow: hidden; }
-  #cubism-player.open { display: block; }
+  #cubism-player { position: fixed; inset: 0; z-index: 10000; display: none; visibility: hidden; opacity: 0; pointer-events: none; background: #07070b; animation: l2dFadeIn 0.22s ease; overflow: hidden; }
+  #cubism-player.open { display: block !important; visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; }
   #cubism-transport-toggle { position: static; z-index: auto; }
   #cubism-transport-panel {
     position: fixed; top: 76px; left: 16px; z-index: 111;
@@ -2116,7 +2116,17 @@ function renderCubismCard(model){
   nameEl.textContent = model.name;
   cell.appendChild(nameEl);
 
-  cell.addEventListener('click', () => openCubismPlayer(model));
+  // Open the viewer synchronously before any async runtime/model loading.
+  // This guarantees the modal itself is visible even if Cubism/WebGL loading fails.
+  cell.addEventListener('click', (e) => {
+    e.preventDefault();
+    cubismPlayer.classList.add('open');
+    cubismPlayer.style.display = 'block';
+    cubismPlayer.style.visibility = 'visible';
+    cubismPlayer.style.opacity = '1';
+    cubismPlayer.style.pointerEvents = 'auto';
+    openCubismPlayer(model);
+  });
   return cell;
 }
 
@@ -3364,6 +3374,10 @@ function teardownCubismActive(){
 
 function closeCubismPlayer(){
   cubismPlayer.classList.remove('open');
+  cubismPlayer.style.display = '';
+  cubismPlayer.style.visibility = '';
+  cubismPlayer.style.opacity = '';
+  cubismPlayer.style.pointerEvents = '';
   document.body.classList.remove('modal-open');
   setCubismDrawerOpen(false);
   teardownCubismActive();
@@ -3451,6 +3465,12 @@ function setCubismExpression(name){
 }
 
 async function openCubismPlayer(model){
+  // The modal is opened before awaiting runtime/network work.
+  cubismPlayer.classList.add('open');
+  cubismPlayer.style.display = 'block';
+  cubismPlayer.style.visibility = 'visible';
+  cubismPlayer.style.opacity = '1';
+  cubismPlayer.style.pointerEvents = 'auto';
   cubismActiveModelKey = model.key;
   cubismPath.textContent = model.folderPath;
   cubismModelName.textContent = model.name;
