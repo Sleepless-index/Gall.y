@@ -3697,8 +3697,24 @@ async function renderCubismModel(framework, model){
     // Per the SDK manual's "Update process" section: eye tracking, physics,
     // and motion playback are applied first, then CubismModel.update() is
     // called once to actually recompute vertex data from Cubism Core.
-    if(!cubismActive.motionPaused){
-      cubismModel.getModel && cubismModel.update?.(dt);
+    //
+    // NOTE: CubismUserModel has no update(dt) method of its own in the Web
+    // Framework — only getModel() exposing the underlying CubismModel. The
+    // previous `cubismModel.update?.(dt)` was therefore silently a no-op
+    // every single frame (optional chaining swallowing the "not a
+    // function" case), so drawable vertex data was never recomputed after
+    // the initial load: the model would sit there technically "playing"
+    // with a fully healthy render loop and draw nothing. Per the manual's
+    // documented order: loadParameters() restores last frame's saved
+    // state, the motion manager overwrites the params it drives,
+    // saveParameters() persists that for next frame, then
+    // CubismModel.update() recomputes vertices from current param values.
+    const coreModel = cubismModel.getModel && cubismModel.getModel();
+    if(coreModel && !cubismActive.motionPaused){
+      coreModel.loadParameters();
+      cubismModel._motionManager?.updateMotion(coreModel, dt);
+      coreModel.saveParameters();
+      coreModel.update();
     }
 
     renderer.setRenderTargetSize?.(canvas.width, canvas.height);
