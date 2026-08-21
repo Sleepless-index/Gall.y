@@ -3606,8 +3606,12 @@ async function renderCubismModel(framework, model){
       // CubismUserModel.loadMotion() expects the raw JSON as an ArrayBuffer.
       // Passing response.text() here can make the framework's JSON parser see
       // an incomplete/invalid buffer and produce "Unexpected end of JSON input".
-      const m = cubismModel.loadMotion(buffer, buffer.byteLength, `${groupName}_${motion.name}`);
-      loadedMotions[`${groupName}::${motion.name}`] = m;
+      try {
+        const m = cubismModel.loadMotion(buffer, buffer.byteLength, `${groupName}_${motion.name}`);
+        if(m) loadedMotions[`${groupName}::${motion.name}`] = m;
+      } catch(err) {
+        console.warn(`[Cubism] Skipping invalid motion ${motion.path}:`, err);
+      }
     }
   }
 
@@ -3619,7 +3623,11 @@ async function renderCubismModel(framework, model){
       if(!data.byteLength) throw new Error(`Expression file is empty: ${expr.path}`);
       return data;
     });
-    cubismModel.loadExpression(buffer, buffer.byteLength, expr.name);
+    try {
+      cubismModel.loadExpression(buffer, buffer.byteLength, expr.name);
+    } catch(err) {
+      console.warn(`[Cubism] Skipping invalid expression ${expr.path}:`, err);
+    }
   }
 
   cubismModel.startMotion = (groupName, index, priority) => {
@@ -3633,7 +3641,9 @@ async function renderCubismModel(framework, model){
     // than re-deriving it keeps this in sync with what was actually
     // preloaded above.
     const loaded = loadedMotions[`${groupName}::${entry.name}`];
-    if(loaded) cubismModel._motionManager.startMotionPriority(loaded, false, priority);
+    if(loaded && cubismModel._motionManager){
+      cubismModel._motionManager.startMotionPriority(loaded, false, priority);
+    }
   };
   cubismModel.setExpression = (name) => {
     cubismModel._expressionManager?.startMotion?.(cubismModel._expressions?.getValue?.(name), false);
