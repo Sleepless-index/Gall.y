@@ -3607,7 +3607,26 @@ async function renderCubismModel(framework, model){
       // Passing response.text() here can make the framework's JSON parser see
       // an incomplete/invalid buffer and produce "Unexpected end of JSON input".
       try {
-        const m = cubismModel.loadMotion(buffer, buffer.byteLength, `${groupName}_${motion.name}`);
+        // IMPORTANT: enable Cubism's motion consistency validation.
+        // Some motion3.json files have stale/wrong Meta.TotalPointCount or
+        // TotalSegmentCount values. The framework otherwise allocates the
+        // point array from those metadata values and then writes into an
+        // undefined point during parsing, producing:
+        // "Cannot set properties of undefined (setting 'time')".
+        // Passing `true` makes Cubism validate the curve/segment/point
+        // counts before populating the arrays, so bad motions are skipped
+        // instead of aborting the entire Cubism modal.
+        const m = cubismModel.loadMotion(
+          buffer,
+          buffer.byteLength,
+          `${groupName}_${motion.name}`,
+          null,
+          null,
+          null,
+          null,
+          null,
+          true
+        );
         if(m) loadedMotions[`${groupName}::${motion.name}`] = m;
       } catch(err) {
         console.warn(`[Cubism] Skipping invalid motion ${motion.path}:`, err);
