@@ -2545,7 +2545,7 @@ function loadCubismRuntime(){
     // Load framework bundle
     let framework;
     try {
-      framework = await import('./vendor/cubism-framework.js');
+      framework = await import('./vendor/cubism-framework.js?t=' + Date.now());
     } catch(importErr) {
       console.error('[Cubism] Framework import failed:', importErr);
       throw new Error(`Cubism Framework import failed: ${importErr.message}`);
@@ -4086,4 +4086,8 @@ async function renderCubismViaFramework(framework, model) {
   cubismPlayToggle.classList.add('active');
   cubismActive.raf = requestAnimationFrame(frame);
 }
->
+
+init(false);
+</script>
+</body>
+</html>
