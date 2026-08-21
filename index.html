@@ -478,6 +478,8 @@
     padding: 24px; background: rgba(7,7,11,.58); backdrop-filter: blur(3px); pointer-events: none;
   }
   #cubism-status.hidden { display: none; }
+  #cubism-debug-overlay { display: none; }
+  #cubism-debug-overlay.visible, #cubism-debug-overlay[style*="display: block"] { display: block !important; }
   #cubism-status .spinner {
     width: 30px; height: 30px; border: 3px solid rgba(255,255,255,.1);
     border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite;
@@ -1099,6 +1101,7 @@ window.GallyMergedRuntime = Object.freeze({
   <div id="cubism-stage">
     <canvas id="cubism-canvas"></canvas>
     <div id="cubism-status"></div>
+    <div id="cubism-debug-overlay" style="position:absolute;top:84px;left:18px;right:18px;z-index:6;max-height:25%;overflow-y:auto;white-space:pre-wrap;word-break:break-all;font-family:var(--mono);font-size:10px;line-height:1.5;color:#ff8585;background:rgba(0,0,0,.66);border:1px solid rgba(255,255,255,.08);padding:7px 10px;border-radius:10px;pointer-events:none;display:none;"></div>
   </div>
   <div class="l2d-stage-hint">Drag to move · Scroll or pinch to zoom · Tap model to interact</div>
 
@@ -2526,15 +2529,35 @@ let cubismRuntimePromise = null;
 function loadCubismRuntime(){
   if(cubismRuntimePromise) return cubismRuntimePromise;
   cubismRuntimePromise = (async () => {
+    // Check CDN-loaded Core first
     if(typeof window.Live2DCubismCore === 'undefined'){
+      console.log('[Cubism] Core not found on window, trying vendor fallback...');
       await loadScript('vendor/live2dcubismcore.min.js');
     }
     if(typeof window.Live2DCubismCore === 'undefined'){
-      throw new Error('Live2D Cubism Core failed to load.');
+      throw new Error('Live2D Cubism Core failed to load. Neither CDN nor vendor file is available.');
     }
-    const framework = await import('./vendor/cubism-framework.js');
-    if(!framework.CubismFramework){
-      throw new Error('Cubism Framework bundle is missing expected exports.');
+    console.log('[Cubism] Core loaded:', typeof window.Live2DCubismCore, Object.keys(window.Live2DCubismCore).slice(0, 10));
+
+    // Load framework bundle
+    let framework;
+    try {
+      framework = await import('./vendor/cubism-framework.js');
+    } catch(importErr) {
+      console.error('[Cubism] Framework import failed:', importErr);
+      throw new Error(`Cubism Framework import failed: ${importErr.message}`);
+    }
+
+    console.log('[Cubism] Framework imported:', typeof framework, framework ? Object.keys(framework).slice(0, 20) : 'null');
+
+    if(!framework || !framework.CubismFramework){
+      // Try default export (some bundlers wrap exports)
+      if(framework && framework.default && framework.default.CubismFramework){
+        framework = framework.default;
+        console.log('[Cubism] Unwrapped framework from .default');
+      } else {
+        throw new Error('Cubism Framework bundle is missing expected exports. Keys found: ' + (framework ? Object.keys(framework).join(', ') : 'none'));
+      }
     }
     return framework;
   })();
@@ -3546,10 +3569,11 @@ async function openCubismPlayer(model){
     if(cubismActiveModelKey !== model.key) return;
     const debugOverlay = document.getElementById("cubism-debug-overlay");
     if (debugOverlay) {
-      debugOverlay.textContent = `${e.message}
+      debugOverlay.style.display = 'block';
+      debugOverlay.textContent = `ERROR: ${e?.message || e}
 
-${e.stack || ""}`;
-      debugOverlay.classList.add("visible");
+STACK:
+${e?.stack || '(no stack trace)'}`;
     }
     cubismSetStatus(`This model failed to render.<br><span style="opacity:0.7;font-size:12px">${(e && e.message) ? e.message : 'Unknown error'}</span>`);
   }
@@ -3571,6 +3595,11 @@ function ensureCubismFrameworkStarted(framework){
 }
 
 async function renderCubismModel(framework, model){
+  // ── Step 0: Validate framework API surface ──
+  const required = ['CubismFramework','CubismUserModel','CubismModelSettingJson','CubismMatrix44'];
+  const missing = required.filter(k => !(k in framework));
+  if(missing.length) throw new Error(`Cubism framework missing exports: ${missing.join(', ')}`);
+
   ensureCubismFrameworkStarted(framework);
 
   const canvas = cubismCanvas;
@@ -3587,38 +3616,71 @@ async function renderCubismModel(framework, model){
     || canvas.getContext('experimental-webgl', { alpha: true, premultipliedAlpha: true });
   if(!gl) throw new Error('WebGL is not available in this browser.');
 
-  // Per the SDK manual's "Load the model" section: parsing .model3.json
-  // uses CubismModelSettingJson, and the actual per-file paths (Moc,
-  // Textures, Motions, Expressions, Physics, ...) it exposes are the same
-  // ones already resolved in discoverCubismModels — fetched again here
-  // fresh, matching how the manual describes ICubismModelSetting being
-  // read at load time rather than cached model-side.
-  const manifestUrl = RAW_BASE + model.modelJsonPath.split('/').map(encodeURIComponent).join('/');
-  const manifestText = await fetch(manifestUrl).then(async r => {
-    if(!r.ok) throw new Error(`Failed to fetch model3.json (HTTP ${r.status})`);
-    const text = await r.text();
-    if(!text.trim()) throw new Error(`model3.json is empty: ${model.modelJsonPath}`);
-    try {
-      JSON.parse(text); // Validate before handing it to the Cubism parser.
-    } catch(err) {
-      throw new Error(`Invalid model3.json for ${model.name}: ${err.message}`);
+  // ── Step 1: Fetch and validate model3.json ──
+  let setting;
+  try {
+    const manifestUrl = RAW_BASE + model.modelJsonPath.split('/').map(encodeURIComponent).join('/');
+    const manifestText = await fetch(manifestUrl).then(async r => {
+      if(!r.ok) throw new Error(`Failed to fetch model3.json (HTTP ${r.status})`);
+      const text = await r.text();
+      if(!text.trim()) throw new Error(`model3.json is empty: ${model.modelJsonPath}`);
+      try { JSON.parse(text); } catch(err) { throw new Error(`Invalid model3.json JSON: ${err.message}`); }
+      return text;
+    });
+    const manifestBytes = new TextEncoder().encode(manifestText);
+    console.debug('[Cubism] model3.json bytes:', bufferInfo(manifestBytes));
+    setting = new framework.CubismModelSettingJson(manifestBytes.buffer, manifestBytes.byteLength);
+  } catch(e) {
+    throw new Error(`Failed to load model manifest: ${e.message}`);
+  }
+
+  // ── Step 2: Create CubismUserModel instance ──
+  let cubismModel;
+  try {
+    cubismModel = new framework.CubismUserModel();
+  } catch(e) {
+    throw new Error(`Failed to create CubismUserModel: ${e.message}`);
+  }
+  if(!cubismModel) throw new Error('CubismUserModel constructor returned null/undefined');
+
+  // ── Step 3: Load .moc3 ──
+  let mocBuffer;
+  try {
+    const mocUrl = RAW_BASE + model.mocPath.split('/').map(encodeURIComponent).join('/');
+    mocBuffer = await fetchArrayBuffer(mocUrl, `MOC file ${model.mocPath}`);
+    console.debug('[Cubism] MOC buffer:', bufferInfo(mocBuffer));
+    // Diagnostic: show first bytes to detect if we got HTML instead of binary
+    const firstBytes = new Uint8Array(mocBuffer.slice(0, 32));
+    const byteStr = Array.from(firstBytes).map(b => b.toString(16).padStart(2,'0')).join(' ');
+    const asText = new TextDecoder('utf-8', {fatal: false}).decode(firstBytes);
+    console.debug('[Cubism] MOC first 32 bytes (hex):', byteStr);
+    console.debug('[Cubism] MOC first 32 bytes (text):', asText);
+    if(asText.trim().startsWith('<')){
+      throw new Error(`MOC file appears to be HTML instead of binary data. First bytes: ${asText.slice(0, 50)}`);
     }
-    return text;
-  });
-  const manifestBytes = new TextEncoder().encode(manifestText);
-  const setting = new framework.CubismModelSettingJson(manifestBytes.buffer, manifestBytes.byteLength);
+  } catch(e) {
+    throw new Error(`Failed to fetch/validate MOC: ${e.message}`);
+  }
 
-  const cubismModel = new framework.CubismUserModel();
+  // Defensive: verify loadModel exists and is a function
+  if(typeof cubismModel.loadModel !== 'function') {
+    throw new Error(`CubismUserModel.loadModel is not a function (got ${typeof cubismModel.loadModel}). Framework version mismatch?`);
+  }
 
-  const mocUrl = RAW_BASE + model.mocPath.split('/').map(encodeURIComponent).join('/');
-  const mocBuffer = await fetchArrayBuffer(mocUrl, `MOC file ${model.mocPath}`);
-  console.debug("Loading MOC:", bufferInfo(mocBuffer));
-  cubismModel.loadModel(mocBuffer, mocBuffer.byteLength);
+  try {
+    // Some framework versions expect (buffer, size), others just (buffer).
+    // Try the 2-arg form first; if it throws about byteLength, fallback.
+    cubismModel.loadModel(mocBuffer, mocBuffer.byteLength);
+  } catch(loadErr) {
+    console.warn('[Cubism] loadModel(buffer, size) failed, trying loadModel(buffer):', loadErr);
+    try {
+      cubismModel.loadModel(mocBuffer);
+    } catch(fallbackErr) {
+      throw new Error(`loadModel failed: ${fallbackErr.message}`);
+    }
+  }
 
-  // Create the WebGL renderer with the actual backing-buffer dimensions.
-  // Passing no dimensions can leave the renderer's render target at an
-  // invalid/zero size on some Cubism WebGL builds, resulting in a perfectly
-  // healthy animation loop that draws nothing.
+  // ── Step 4: Create renderer ──
   cubismModel.createRenderer(canvas.width, canvas.height);
   const renderer = cubismModel.getRenderer();
   if(!renderer) throw new Error('Cubism renderer failed to initialize.');
@@ -3626,10 +3688,7 @@ async function renderCubismModel(framework, model){
   renderer.setRenderTargetSize?.(canvas.width, canvas.height);
   renderer.setIsPremultipliedAlpha(true);
 
-  // Textures: fetched as plain <img> elements and bound the same way the
-  // Spine player's fetchTexture already does elsewhere in this file, then
-  // registered on the renderer by texture-slot index (the order Textures
-  // appears in .model3.json, per the manual's model-loading section).
+  // ── Step 5: Load textures ──
   await Promise.all(model.textureUrls.map((texPath, index) => new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -3647,16 +3706,17 @@ async function renderCubismModel(framework, model){
     img.src = RAW_BASE + texPath.split('/').map(encodeURIComponent).join('/');
   })));
 
+  // ── Step 6: Optional physics & pose ──
   if (model.physicsPath) {
     try {
       const physicsUrl = RAW_BASE + model.physicsPath.split('/').map(encodeURIComponent).join('/');
       const physicsBuffer = await fetchArrayBuffer(physicsUrl, `Physics file ${model.physicsPath}`);
-      console.debug("Loading physics:", bufferInfo(physicsBuffer));
-      if (typeof cubismModel.loadPhysics === "function") {
+      console.debug('[Cubism] Physics buffer:', bufferInfo(physicsBuffer));
+      if (typeof cubismModel.loadPhysics === 'function') {
         cubismModel.loadPhysics(physicsBuffer, physicsBuffer.byteLength);
       }
     } catch (error) {
-      console.warn("Physics skipped:", error);
+      console.warn('[Cubism] Physics skipped:', error);
     }
   }
 
@@ -3664,26 +3724,23 @@ async function renderCubismModel(framework, model){
     try {
       const poseUrl = RAW_BASE + model.poseJsonPath.split('/').map(encodeURIComponent).join('/');
       const poseBuffer = await fetchArrayBuffer(poseUrl, `Pose file ${model.poseJsonPath}`);
-      console.debug("Loading pose:", bufferInfo(poseBuffer));
-      if (typeof cubismModel.loadPose === "function") {
+      console.debug('[Cubism] Pose buffer:', bufferInfo(poseBuffer));
+      if (typeof cubismModel.loadPose === 'function') {
         cubismModel.loadPose(poseBuffer, poseBuffer.byteLength);
       }
     } catch (error) {
-      console.warn("Pose skipped:", error);
+      console.warn('[Cubism] Pose skipped:', error);
     }
   }
 
-  // Every declared motion is preloaded up front (folder sizes here are
-  // small — confirmed directly, e.g. 25 motions for 300401_hongnujian —
-  // so this is a reasonable tradeoff against the complexity of lazy-
-  // loading motions on first play).
+  // ── Step 7: Preload motions ──
   const loadedMotions = {};
   for (const [groupName, motions] of Object.entries(model.motionGroups)) {
     for (const motion of motions) {
       const url = RAW_BASE + motion.path.split('/').map(encodeURIComponent).join('/');
       try {
         const motionBuffer = await fetchArrayBuffer(url, `Motion ${groupName}/${motion.name}`);
-        console.debug("Loading motion:", { group: groupName, name: motion.name, ...bufferInfo(motionBuffer) });
+        console.debug('[Cubism] Motion buffer:', { group: groupName, name: motion.name, ...bufferInfo(motionBuffer) });
         const m = cubismModel.loadMotion(
           motionBuffer,
           motionBuffer.byteLength,
@@ -3696,27 +3753,23 @@ async function renderCubismModel(framework, model){
     }
   }
 
+  // ── Step 8: Preload expressions ──
   for (const expr of model.expressionPaths) {
     const url = RAW_BASE + expr.path.split('/').map(encodeURIComponent).join('/');
     try {
       const expressionBuffer = await fetchArrayBuffer(url, `Expression ${expr.name}`);
-      console.debug("Loading expression:", { expressionName: expr.name, ...bufferInfo(expressionBuffer) });
+      console.debug('[Cubism] Expression buffer:', { expressionName: expr.name, ...bufferInfo(expressionBuffer) });
       cubismModel.loadExpression(expressionBuffer, expressionBuffer.byteLength, expr.name);
     } catch (err) {
       console.warn(`[Cubism] Skipping invalid expression ${expr.path}:`, err);
     }
   }
 
+  // ── Step 9: Motion/expression playback helpers ──
   cubismModel.startMotion = (groupName, index, priority) => {
     const motions = model.motionGroups[groupName] || [];
     const entry = motions[index];
     if(!entry) return;
-    // ACubismMotion instances loaded above are handed to the model's own
-    // motion manager via CubismUserModel's motion-playing path — Framework
-    // exposes this as part of CubismUserModel per the manual's Motion
-    // section reference; using the loaded instance directly here rather
-    // than re-deriving it keeps this in sync with what was actually
-    // preloaded above.
     const loaded = loadedMotions[`${groupName}::${entry.name}`];
     if(loaded && cubismModel._motionManager){
       cubismModel._motionManager.startMotionPriority(loaded, false, priority);
@@ -3726,11 +3779,8 @@ async function renderCubismModel(framework, model){
     cubismModel._expressionManager?.startMotion?.(cubismModel._expressions?.getValue?.(name), false);
   };
 
-  // Camera state reuses the exact same screen<->world math as the Spine
-  // player (stagePxToWorld/screenToWorld/zoomAround below are generic
-  // canvas/viewport math with no Spine-specific assumptions) — wired to
-  // this canvas/stage pair instead.
-  const bounds = { size: { x: 2, y: 2 } }; // Cubism's canonical model space is [-1,1] on both axes
+  // ── Step 10: Camera & render loop ──
+  const bounds = { size: { x: 2, y: 2 } };
   const homeCenter = { x: 0, y: 0 };
   const boundsAspect = 1;
   const camPad = 1.35;
@@ -3745,21 +3795,6 @@ async function renderCubismModel(framework, model){
     const dt = Math.min(0.1, (now - lastTime) / 1000);
     lastTime = now;
 
-    // Per the SDK manual's "Update process" section: eye tracking, physics,
-    // and motion playback are applied first, then CubismModel.update() is
-    // called once to actually recompute vertex data from Cubism Core.
-    //
-    // NOTE: CubismUserModel has no update(dt) method of its own in the Web
-    // Framework — only getModel() exposing the underlying CubismModel. The
-    // previous `cubismModel.update?.(dt)` was therefore silently a no-op
-    // every single frame (optional chaining swallowing the "not a
-    // function" case), so drawable vertex data was never recomputed after
-    // the initial load: the model would sit there technically "playing"
-    // with a fully healthy render loop and draw nothing. Per the manual's
-    // documented order: loadParameters() restores last frame's saved
-    // state, the motion manager overwrites the params it drives,
-    // saveParameters() persists that for next frame, then
-    // CubismModel.update() recomputes vertices from current param values.
     const coreModel = cubismModel.getModel && cubismModel.getModel();
     if(coreModel && !cubismActive.motionPaused){
       coreModel.loadParameters();
@@ -3975,6 +4010,14 @@ sbToggle.addEventListener('click', () => {
   sidebar.classList.contains('open') ? closeSidebarMobile() : openSidebarMobile();
 });
 sbOverlay.addEventListener('click', closeSidebarMobile);
+
+// Global error handler for Cubism diagnostics
+window.addEventListener('error', (e) => {
+  console.error('[Global Error]', e.message, e.filename, e.lineno, e.colno, e.error);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('[Unhandled Rejection]', e.reason);
+});
 
 init(false);
 </script>
