@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gall.y — Merged</title>
+<title>Gall.y — Merged (v2026-08-22-cubism-fix)</title>
 <style>
   :root {
     --bg: #0b0b0f;
@@ -881,7 +884,7 @@
 <body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
 <script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js"></script>
+<!-- cubism4.min.js removed: conflicts with custom vendor framework -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <script>
@@ -3393,6 +3396,14 @@ function cubismSetStatus(html){
   cubismStatusEl.classList.remove('hidden');
   cubismStatusEl.innerHTML = html;
 }
+// Cache-busting: show version in status on first open
+function showCacheWarning(){
+  const warn = document.createElement('div');
+  warn.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:999;background:#ef4444;color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+  warn.textContent = 'If you see old errors, HARD REFRESH (Ctrl+F5) to clear cache!';
+  document.body.appendChild(warn);
+  setTimeout(() => warn.remove(), 5000);
+}
 function cubismHideStatus(){
   cubismStatusEl.classList.add('hidden');
 }
@@ -3530,6 +3541,10 @@ function setCubismExpression(name){
 }
 
 async function openCubismPlayer(model){
+  showCacheWarning();
+  console.log('[Cubism] openCubismPlayer called at', new Date().toISOString());
+  console.log('[Cubism] Version: v2026-08-22-cubism-fix. If errors persist, HARD REFRESH (Ctrl+F5)!');
+
   cubismActiveModelKey = model.key;
   cubismPath.textContent = model.folderPath;
   cubismModelName.textContent = model.name;
@@ -3595,7 +3610,221 @@ function ensureCubismFrameworkStarted(framework){
 }
 
 async function renderCubismModel(framework, model){
-  // ── Step 0: Validate framework API surface ──
+  // ── Strategy A: Try pixi-live2d-display (bundles its own Core+Framework) ──
+  const Live2DModel = window.Live2DModel || window.PIXI?.live2d?.Live2DModel;
+  console.log('[Cubism] pixi-live2d-display Live2DModel available?', typeof Live2DModel);
+
+  if(typeof Live2DModel !== 'undefined' && Live2DModel.from) {
+    console.log('[Cubism] Using pixi-live2d-display strategy');
+    return await renderCubismViaPixi(model, Live2DModel);
+  }
+
+  // ── Strategy B: Fallback to custom framework ──
+  console.log('[Cubism] pixi-live2d-display not available, falling back to custom framework');
+  return await renderCubismViaFramework(framework, model);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Strategy A: pixi-live2d-display (recommended, self-contained)
+// ──────────────────────────────────────────────────────────────────────────────
+async function renderCubismViaPixi(model, Live2DModel) {
+  const canvas = cubismCanvas;
+  const dpr = window.devicePixelRatio || 1;
+
+  // Create PIXI app attached to our canvas
+  const app = new PIXI.Application({
+    view: canvas,
+    resizeTo: canvas.parentElement,
+    backgroundAlpha: 0,
+    antialias: true,
+    resolution: dpr,
+    autoDensity: true
+  });
+
+  cubismHideStatus();
+  cubismSetStatus(`<div class="spinner"></div><div>Loading model via pixi-live2d-display…</div>`);
+
+  let pixiModel;
+  try {
+    const modelUrl = RAW_BASE + model.modelJsonPath.split('/').map(encodeURIComponent).join('/');
+    console.log('[Cubism] Loading model from:', modelUrl);
+    pixiModel = await Live2DModel.from(modelUrl);
+    console.log('[Cubism] Model loaded:', pixiModel);
+  } catch(e) {
+    console.error('[Cubism] Live2DModel.from failed:', e);
+    throw new Error(`pixi-live2d-display failed to load model: ${e.message}`);
+  }
+
+  // Center and scale the model
+  const stageW = app.screen.width;
+  const stageH = app.screen.height;
+  pixiModel.anchor.set(0.5, 0.5);
+  pixiModel.position.set(stageW / 2, stageH / 2);
+
+  // Auto-scale to fit
+  const bounds = pixiModel.getBounds();
+  const scaleX = stageW / bounds.width * 0.8;
+  const scaleY = stageH / bounds.height * 0.8;
+  pixiModel.scale.set(Math.min(scaleX, scaleY));
+
+  app.stage.addChild(pixiModel);
+  cubismHideStatus();
+
+  // ── Playback controls ──
+  // Collect available motions and expressions
+  const motionNames = [];
+  const expressionNames = [];
+
+  // pixi-live2d-display exposes internal model data differently depending on version
+  const internal = pixiModel.internalModel || pixiModel;
+  if(internal.motionManager) {
+    // Motions
+    const groups = internal.motionManager.definitions || {};
+    Object.entries(groups).forEach(([group, defs]) => {
+      (defs || []).forEach((def, idx) => {
+        motionNames.push({ group, index: idx, name: def.Name || def.name || `${group}_${idx}` });
+      });
+    });
+  }
+  if(internal.expressionManager) {
+    const exprs = internal.expressionManager.definitions || [];
+    exprs.forEach((def, idx) => {
+      expressionNames.push({ index: idx, name: def.Name || def.name || `expr_${idx}` });
+    });
+  }
+
+  // Populate UI
+  populateCubismMotionButtonsFromPixi(motionNames, pixiModel);
+  populateCubismExpressionButtonsFromPixi(expressionNames, pixiModel);
+
+  // Play default idle motion
+  if(motionNames.length > 0) {
+    const idle = motionNames.find(m => /idle/i.test(m.name)) || motionNames[0];
+    try {
+      pixiModel.motion(idle.group || idle.name, undefined, 2);
+      cubismNowPlayingName.textContent = idle.name;
+    } catch(e) {
+      console.warn('[Cubism] Default motion failed:', e);
+    }
+  }
+
+  // Play/pause toggle
+  let motionPaused = false;
+  cubismPlayToggle.onclick = () => {
+    motionPaused = !motionPaused;
+    cubismPlayToggle.classList.toggle('active', !motionPaused);
+    if(internal.motionManager) {
+      internal.motionManager.update = motionPaused ? () => {} : undefined; // hacky pause
+    }
+  };
+  cubismPlayToggle.classList.add('active');
+
+  // Camera pan/zoom via PIXI transform
+  const camView = { zoom: 1, offsetX: 0, offsetY: 0 };
+  const cubismCameraApi = setupCameraForStage({
+    stage: cubismStage, canvas, resetBtn: cubismResetCam,
+    bounds: { size: { x: stageW, y: stageH } },
+    homeCenter: { x: 0, y: 0 },
+    boundsAspect: stageW / stageH,
+    camPad: 1,
+    camView
+  });
+
+  // Update PIXI model transform from camera
+  function updateTransform() {
+    pixiModel.scale.set(Math.min(scaleX, scaleY) * camView.zoom);
+    pixiModel.position.set(stageW/2 + camView.offsetX, stageH/2 + camView.offsetY);
+  }
+
+  // Hook into camera updates
+  const origTeardown = cubismCameraApi.teardown;
+  cubismCameraApi.teardown = () => {
+    origTeardown();
+    if(cubismActive?.pixiTicker) app.ticker.remove(cubismActive.pixiTicker);
+  };
+
+  const pixiTicker = () => updateTransform();
+  app.ticker.add(pixiTicker);
+
+  cubismActive = {
+    app, pixiModel, motionPaused,
+    resizeCanvasToContainer: () => app.resize(),
+    cleanupResize: () => { cubismCameraApi.teardown(); app.destroy(true); },
+    pixiTicker
+  };
+}
+
+function populateCubismMotionButtonsFromPixi(motions, pixiModel) {
+  cubismMotionGroupsEl.innerHTML = '';
+  if(!motions.length) return;
+  const groupEl = document.createElement('div');
+  groupEl.className = 'l2d-anim-group';
+  const label = document.createElement('div');
+  label.className = 'l2d-anim-group-label';
+  label.textContent = 'Motions';
+  groupEl.appendChild(label);
+  const row = document.createElement('div');
+  row.className = 'l2d-anim-row';
+  motions.forEach(motion => {
+    const btn = document.createElement('button');
+    btn.className = 'l2d-anim-btn';
+    btn.textContent = motion.name;
+    btn.addEventListener('click', () => {
+      row.querySelectorAll('.l2d-anim-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      cubismNowPlayingName.textContent = motion.name;
+      try {
+        pixiModel.motion(motion.group || motion.name, undefined, 2);
+      } catch(e) {
+        console.warn('[Cubism] Motion failed:', e);
+      }
+    });
+    row.appendChild(btn);
+  });
+  groupEl.appendChild(row);
+  cubismMotionGroupsEl.appendChild(groupEl);
+}
+
+function populateCubismExpressionButtonsFromPixi(expressions, pixiModel) {
+  cubismExpressionGroupEl.innerHTML = '';
+  if(!expressions.length) return;
+  const row = document.createElement('div');
+  row.className = 'l2d-anim-row';
+  expressions.forEach(expr => {
+    const btn = document.createElement('button');
+    btn.className = 'l2d-anim-btn';
+    btn.textContent = expr.name;
+    btn.addEventListener('click', () => {
+      row.querySelectorAll('.l2d-anim-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      try {
+        pixiModel.expression(expr.name);
+      } catch(e) {
+        console.warn('[Cubism] Expression failed:', e);
+      }
+    });
+    row.appendChild(btn);
+  });
+  cubismExpressionGroupEl.appendChild(row);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Strategy B: Custom framework (original, with all diagnostics)
+// ──────────────────────────────────────────────────────────────────────────────
+async function renderCubismViaFramework(framework, model) {
+  console.log('[Cubism] ========== FRAMEWORK DIAGNOSTICS ==========');
+  console.log('[Cubism] framework keys:', framework ? Object.keys(framework).sort().join(', ') : 'null');
+  console.log('[Cubism] Live2DCubismCore exists:', typeof window.Live2DCubismCore);
+  if(window.Live2DCubismCore) {
+    console.log('[Cubism] Live2DCubismCore keys:', Object.keys(window.Live2DCubismCore).sort().join(', '));
+    console.log('[Cubism] Live2DCubismCore.Version:', window.Live2DCubismCore.Version);
+    console.log('[Cubism] Moc exists:', typeof window.Live2DCubismCore.Moc);
+    if(window.Live2DCubismCore.Moc) {
+      console.log('[Cubism] Moc keys:', Object.keys(window.Live2DCubismCore.Moc).join(', '));
+      console.log('[Cubism] fromArrayBuffer type:', typeof window.Live2DCubismCore.Moc.fromArrayBuffer);
+    }
+  }
+
   const required = ['CubismFramework','CubismUserModel','CubismModelSettingJson','CubismMatrix44'];
   const missing = required.filter(k => !(k in framework));
   if(missing.length) throw new Error(`Cubism framework missing exports: ${missing.join(', ')}`);
@@ -3616,7 +3845,6 @@ async function renderCubismModel(framework, model){
     || canvas.getContext('experimental-webgl', { alpha: true, premultipliedAlpha: true });
   if(!gl) throw new Error('WebGL is not available in this browser.');
 
-  // ── Step 1: Fetch and validate model3.json ──
   let setting;
   try {
     const manifestUrl = RAW_BASE + model.modelJsonPath.split('/').map(encodeURIComponent).join('/');
@@ -3628,13 +3856,11 @@ async function renderCubismModel(framework, model){
       return text;
     });
     const manifestBytes = new TextEncoder().encode(manifestText);
-    console.debug('[Cubism] model3.json bytes:', bufferInfo(manifestBytes));
     setting = new framework.CubismModelSettingJson(manifestBytes.buffer, manifestBytes.byteLength);
   } catch(e) {
     throw new Error(`Failed to load model manifest: ${e.message}`);
   }
 
-  // ── Step 2: Create CubismUserModel instance ──
   let cubismModel;
   try {
     cubismModel = new framework.CubismUserModel();
@@ -3643,44 +3869,100 @@ async function renderCubismModel(framework, model){
   }
   if(!cubismModel) throw new Error('CubismUserModel constructor returned null/undefined');
 
-  // ── Step 3: Load .moc3 ──
   let mocBuffer;
   try {
     const mocUrl = RAW_BASE + model.mocPath.split('/').map(encodeURIComponent).join('/');
     mocBuffer = await fetchArrayBuffer(mocUrl, `MOC file ${model.mocPath}`);
-    console.debug('[Cubism] MOC buffer:', bufferInfo(mocBuffer));
-    // Diagnostic: show first bytes to detect if we got HTML instead of binary
     const firstBytes = new Uint8Array(mocBuffer.slice(0, 32));
-    const byteStr = Array.from(firstBytes).map(b => b.toString(16).padStart(2,'0')).join(' ');
     const asText = new TextDecoder('utf-8', {fatal: false}).decode(firstBytes);
-    console.debug('[Cubism] MOC first 32 bytes (hex):', byteStr);
-    console.debug('[Cubism] MOC first 32 bytes (text):', asText);
     if(asText.trim().startsWith('<')){
-      throw new Error(`MOC file appears to be HTML instead of binary data. First bytes: ${asText.slice(0, 50)}`);
+      throw new Error(`MOC file appears to be HTML instead of binary data.`);
     }
+    const moc3Magic = new TextDecoder().decode(mocBuffer.slice(0, 4));
+    console.log('[Cubism] MOC3 magic:', moc3Magic);
   } catch(e) {
     throw new Error(`Failed to fetch/validate MOC: ${e.message}`);
   }
 
-  // Defensive: verify loadModel exists and is a function
-  if(typeof cubismModel.loadModel !== 'function') {
-    throw new Error(`CubismUserModel.loadModel is not a function (got ${typeof cubismModel.loadModel}). Framework version mismatch?`);
+  console.log('[Cubism] cubismModel type:', typeof cubismModel);
+  console.log('[Cubism] cubismModel constructor:', cubismModel?.constructor?.name);
+  console.log('[Cubism] loadModel type:', typeof cubismModel?.loadModel);
+  if(cubismModel?.loadModel) {
+    console.log('[Cubism] loadModel source:', cubismModel.loadModel.toString().slice(0, 300));
   }
 
+  let globalCoreMoc = null;
   try {
-    // Some framework versions expect (buffer, size), others just (buffer).
-    // Try the 2-arg form first; if it throws about byteLength, fallback.
-    cubismModel.loadModel(mocBuffer, mocBuffer.byteLength);
-  } catch(loadErr) {
-    console.warn('[Cubism] loadModel(buffer, size) failed, trying loadModel(buffer):', loadErr);
+    if(window.Live2DCubismCore?.Moc?.fromArrayBuffer) {
+      globalCoreMoc = window.Live2DCubismCore.Moc.fromArrayBuffer(mocBuffer);
+      console.log('[Cubism] GLOBAL Core Moc test:', globalCoreMoc ? 'PASS' : 'FAIL (returned null)');
+    }
+  } catch(e) {
+    console.error('[Cubism] GLOBAL Core Moc test:', 'FAIL -', e.message);
+  }
+
+  const _originalLoadModel = cubismModel.loadModel;
+  cubismModel.loadModel = function(...args) {
+    console.log('[Cubism] loadModel called with', args.length, 'args:');
+    args.forEach((a, i) => console.log(`  arg[${i}]:`, typeof a, a?.constructor?.name, 'byteLength=', a?.byteLength));
     try {
-      cubismModel.loadModel(mocBuffer);
-    } catch(fallbackErr) {
-      throw new Error(`loadModel failed: ${fallbackErr.message}`);
+      return _originalLoadModel.apply(this, args);
+    } catch(e) {
+      console.error('[Cubism] loadModel THREW:', e.name, e.message);
+      throw e;
+    }
+  };
+
+  let loadSuccess = false;
+  const loadAttempts = [];
+
+  const signatures = [
+    [mocBuffer, mocBuffer.byteLength],
+    [mocBuffer],
+    [new Uint8Array(mocBuffer)],
+    [new Uint8Array(mocBuffer), new Uint8Array(mocBuffer).byteLength]
+  ];
+
+  for(const sig of signatures) {
+    try {
+      cubismModel.loadModel(...sig);
+      console.log('[Cubism] loadModel succeeded with signature:', sig.map(s => s?.constructor?.name).join(', '));
+      loadSuccess = true;
+      break;
+    } catch(err) {
+      loadAttempts.push({ sig: sig.map(s => s?.constructor?.name).join(', '), error: err.message });
+      console.warn('[Cubism] loadModel failed:', err.message);
     }
   }
 
-  // ── Step 4: Create renderer ──
+  if(!loadSuccess && globalCoreMoc) {
+    console.warn('[Cubism] Attempting emergency direct-Core fallback...');
+    try {
+      cubismModel._moc = globalCoreMoc;
+      if(typeof globalCoreMoc.createModel === 'function') {
+        cubismModel._model = globalCoreMoc.createModel();
+        if(cubismModel._model) loadSuccess = true;
+      }
+    } catch(e) {
+      console.error('[Cubism] Emergency fallback failed:', e);
+    }
+  }
+
+  if(!loadSuccess) {
+    const coreVer = window.Live2DCubismCore?.Version;
+    const coreVerStr = coreVer ? `${coreVer.major || '?'}.${coreVer.minor || '?'}.${coreVer.patch || '?'}` : 'unknown';
+    const attemptSummary = loadAttempts.map(a => `  ${a.sig}: ${a.error}`).join('\n');
+    const diagMsg =
+      `Cubism model loading failed after 4 attempts.\n\n` +
+      `Core version: ${coreVerStr}\n` +
+      `Global Core Moc test: ${globalCoreMoc ? 'PASS' : 'FAIL'}\n` +
+      `Attempts:\n${attemptSummary}\n\n` +
+      `This usually means the bundled cubism-framework.js is incompatible with the loaded Cubism Core. ` +
+      `Please verify that vendor/cubism-framework.js was built against the SAME Core version as the CDN script.`;
+    console.error('[Cubism] FINAL ERROR:', diagMsg);
+    throw new Error(diagMsg);
+  }
+
   cubismModel.createRenderer(canvas.width, canvas.height);
   const renderer = cubismModel.getRenderer();
   if(!renderer) throw new Error('Cubism renderer failed to initialize.');
@@ -3688,7 +3970,6 @@ async function renderCubismModel(framework, model){
   renderer.setRenderTargetSize?.(canvas.width, canvas.height);
   renderer.setIsPremultipliedAlpha(true);
 
-  // ── Step 5: Load textures ──
   await Promise.all(model.textureUrls.map((texPath, index) => new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -3706,66 +3987,46 @@ async function renderCubismModel(framework, model){
     img.src = RAW_BASE + texPath.split('/').map(encodeURIComponent).join('/');
   })));
 
-  // ── Step 6: Optional physics & pose ──
   if (model.physicsPath) {
     try {
       const physicsUrl = RAW_BASE + model.physicsPath.split('/').map(encodeURIComponent).join('/');
       const physicsBuffer = await fetchArrayBuffer(physicsUrl, `Physics file ${model.physicsPath}`);
-      console.debug('[Cubism] Physics buffer:', bufferInfo(physicsBuffer));
       if (typeof cubismModel.loadPhysics === 'function') {
         cubismModel.loadPhysics(physicsBuffer, physicsBuffer.byteLength);
       }
-    } catch (error) {
-      console.warn('[Cubism] Physics skipped:', error);
-    }
+    } catch (error) { console.warn('[Cubism] Physics skipped:', error); }
   }
 
   if (model.poseJsonPath) {
     try {
       const poseUrl = RAW_BASE + model.poseJsonPath.split('/').map(encodeURIComponent).join('/');
       const poseBuffer = await fetchArrayBuffer(poseUrl, `Pose file ${model.poseJsonPath}`);
-      console.debug('[Cubism] Pose buffer:', bufferInfo(poseBuffer));
       if (typeof cubismModel.loadPose === 'function') {
         cubismModel.loadPose(poseBuffer, poseBuffer.byteLength);
       }
-    } catch (error) {
-      console.warn('[Cubism] Pose skipped:', error);
-    }
+    } catch (error) { console.warn('[Cubism] Pose skipped:', error); }
   }
 
-  // ── Step 7: Preload motions ──
   const loadedMotions = {};
   for (const [groupName, motions] of Object.entries(model.motionGroups)) {
     for (const motion of motions) {
       const url = RAW_BASE + motion.path.split('/').map(encodeURIComponent).join('/');
       try {
         const motionBuffer = await fetchArrayBuffer(url, `Motion ${groupName}/${motion.name}`);
-        console.debug('[Cubism] Motion buffer:', { group: groupName, name: motion.name, ...bufferInfo(motionBuffer) });
-        const m = cubismModel.loadMotion(
-          motionBuffer,
-          motionBuffer.byteLength,
-          `${groupName}_${motion.name}`
-        );
+        const m = cubismModel.loadMotion(motionBuffer, motionBuffer.byteLength, `${groupName}_${motion.name}`);
         if (m) loadedMotions[`${groupName}::${motion.name}`] = m;
-      } catch (err) {
-        console.warn(`[Cubism] Skipping invalid motion ${motion.path}:`, err);
-      }
+      } catch (err) { console.warn(`[Cubism] Skipping invalid motion ${motion.path}:`, err); }
     }
   }
 
-  // ── Step 8: Preload expressions ──
   for (const expr of model.expressionPaths) {
     const url = RAW_BASE + expr.path.split('/').map(encodeURIComponent).join('/');
     try {
       const expressionBuffer = await fetchArrayBuffer(url, `Expression ${expr.name}`);
-      console.debug('[Cubism] Expression buffer:', { expressionName: expr.name, ...bufferInfo(expressionBuffer) });
       cubismModel.loadExpression(expressionBuffer, expressionBuffer.byteLength, expr.name);
-    } catch (err) {
-      console.warn(`[Cubism] Skipping invalid expression ${expr.path}:`, err);
-    }
+    } catch (err) { console.warn(`[Cubism] Skipping invalid expression ${expr.path}:`, err); }
   }
 
-  // ── Step 9: Motion/expression playback helpers ──
   cubismModel.startMotion = (groupName, index, priority) => {
     const motions = model.motionGroups[groupName] || [];
     const entry = motions[index];
@@ -3779,7 +4040,6 @@ async function renderCubismModel(framework, model){
     cubismModel._expressionManager?.startMotion?.(cubismModel._expressions?.getValue?.(name), false);
   };
 
-  // ── Step 10: Camera & render loop ──
   const bounds = { size: { x: 2, y: 2 } };
   const homeCenter = { x: 0, y: 0 };
   const boundsAspect = 1;
@@ -3794,7 +4054,6 @@ async function renderCubismModel(framework, model){
   function frame(now){
     const dt = Math.min(0.1, (now - lastTime) / 1000);
     lastTime = now;
-
     const coreModel = cubismModel.getModel && cubismModel.getModel();
     if(coreModel && !cubismActive.motionPaused){
       coreModel.loadParameters();
@@ -3802,26 +4061,20 @@ async function renderCubismModel(framework, model){
       coreModel.saveParameters();
       coreModel.update();
     }
-
     renderer.setRenderTargetSize?.(canvas.width, canvas.height);
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.BLEND);
-
     const mvp = new framework.CubismMatrix44();
     mvp.loadIdentity();
     const canvasAspect = canvas.width / canvas.height;
     const scale = camView.zoom;
-    if(canvasAspect > 1){
-      mvp.scale(scale / canvasAspect, scale);
-    } else {
-      mvp.scale(scale, scale * canvasAspect);
-    }
+    if(canvasAspect > 1){ mvp.scale(scale / canvasAspect, scale); }
+    else { mvp.scale(scale, scale * canvasAspect); }
     mvp.translateRelative(camView.offsetX, camView.offsetY);
     renderer.setMvpMatrix(mvp);
     renderer.drawModel();
-
     cubismActive.raf = requestAnimationFrame(frame);
   }
 
@@ -3833,193 +4086,4 @@ async function renderCubismModel(framework, model){
   cubismPlayToggle.classList.add('active');
   cubismActive.raf = requestAnimationFrame(frame);
 }
-
-lbDownload.addEventListener('click', async () => {
-  if(!currentLightboxImg) return;
-  lbDownload.classList.add('loading');
-  try{
-    await downloadSingle(currentLightboxImg);
-  } catch(e){
-    console.error(e);
-  }
-  lbDownload.classList.remove('loading');
-});
-
-document.getElementById('lb-close').addEventListener('click', closeLightbox);
-lightbox.addEventListener('click', e => { if(e.target === lightbox) closeLightbox(); });
-
-document.addEventListener('keydown', e => { 
-  if(lightbox.classList.contains('open')){
-    if(e.key === 'Escape') closeLightbox(); 
-  }
-});
-
-let debounceTimer;
-sbSearch.addEventListener('input', () => {
-  clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    searchQuery = sbSearch.value;
-    applyFilters();
-  }, 200);
-});
-
-selectToggle.addEventListener('click', () => {
-  selectMode = !selectMode;
-  document.body.classList.toggle('select-mode', selectMode);
-  selectToggle.classList.toggle('active', selectMode);
-  selectToggle.textContent = selectMode ? 'Cancel Selection' : 'Select Mode';
-  if(!selectMode){
-    selectedPaths.clear();
-  }
-  updateDownloadBar();
-  applyFilters();
-});
-
-clearSelectionBtn.addEventListener('click', () => {
-  selectedPaths.clear();
-  updateDownloadBar();
-  applyFilters();
-});
-
-async function downloadSingle(img){
-  const rawUrl = RAW_BASE + img.path.split('/').map(encodeURIComponent).join('/');
-  const res = await fetch(rawUrl);
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = img.name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-async function buildAndDownloadZip(imgList, zipFilename, btn, disableAlso){
-  if(typeof JSZip === 'undefined'){
-    alert('Zip library failed to load — check your connection and try again.');
-    return;
-  }
-
-  btn.disabled = true;
-  if(disableAlso) disableAlso.forEach(b => b.disabled = true);
-  const originalText = btn.innerHTML;
-  const zip = new JSZip();
-  let failCount = 0;
-
-  for(let i = 0; i < imgList.length; i++){
-    const img = imgList[i];
-    btn.textContent = `Zipping ${i+1}/${imgList.length}…`;
-    try{
-      const rawUrl = RAW_BASE + img.path.split('/').map(encodeURIComponent).join('/');
-      const res = await fetch(rawUrl);
-      if(!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      zip.file(img.path, blob);
-    } catch(e){
-      failCount++;
-      console.error('Failed to fetch for zip:', img.path, e);
-    }
-  }
-
-  btn.textContent = 'Compressing…';
-  try{
-    const content = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } },
-      (metadata) => {
-        btn.textContent = `Compressing… ${Math.round(metadata.percent)}%`;
-      });
-    const url = URL.createObjectURL(content);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = zipFilename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  } catch(e){
-    console.error(e);
-    alert('Failed to build the zip file.');
-  }
-
-  if(failCount > 0){
-    alert(`${failCount} file(s) failed to download and were left out of the zip.`);
-  }
-
-  btn.innerHTML = originalText;
-  btn.disabled = false;
-  if(disableAlso) disableAlso.forEach(b => b.disabled = false);
-}
-
-downloadSelectedBtn.addEventListener('click', async () => {
-  const paths = [...selectedPaths];
-  if(paths.length === 0) return;
-
-  const confirmed = await showConfirm(`Package ${paths.length} selected file${paths.length===1?'':'s'} into one .zip and save it to your device?`, 'Download Selection');
-  if(!confirmed) return;
-
-  const imgList = paths.map(p => allImages.find(x => x.path === p)).filter(Boolean);
-  await buildAndDownloadZip(imgList, `gally-export-${Date.now()}.zip`, downloadSelectedBtn, [clearSelectionBtn]);
-});
-
-downloadFolderBtn.addEventListener('click', async () => {
-  const imgList = filtered.slice();
-  if(imgList.length === 0) return;
-
-  const folderLabel = selectedFolder || 'All';
-  const sizeNote = imgList.length > 250
-    ? ` Since that's a large batch, it may take a few minutes and use noticeable memory while it builds.`
-    : '';
-  const confirmed = await showConfirm(
-    `This will package all ${imgList.length.toLocaleString()} file${imgList.length===1?'':'s'} in "${folderLabel}" into one .zip file to save to your device.${sizeNote}`,
-    'Download Folder'
-  );
-  if(!confirmed) return;
-
-  const safeName = folderLabel.replace(/[^a-z0-9_-]+/gi, '_');
-  await buildAndDownloadZip(imgList, `gally-${safeName}-${Date.now()}.zip`, downloadFolderBtn, [selectToggle]);
-});
-
-const confirmModal = document.getElementById('confirm-modal');
-const confirmTitle = document.getElementById('confirm-title');
-const confirmMsg = document.getElementById('confirm-msg');
-const confirmOk = document.getElementById('confirm-ok');
-const confirmCancel = document.getElementById('confirm-cancel');
-let confirmResolver = null;
-
-function showConfirm(message, title){
-  confirmTitle.textContent = title || 'Confirm';
-  confirmMsg.textContent = message;
-  confirmModal.classList.add('open');
-  return new Promise(resolve => { confirmResolver = resolve; });
-}
-function resolveConfirm(val){
-  confirmModal.classList.remove('open');
-  if(confirmResolver){ confirmResolver(val); confirmResolver = null; }
-}
-confirmOk.addEventListener('click', () => resolveConfirm(true));
-confirmCancel.addEventListener('click', () => resolveConfirm(false));
-confirmModal.addEventListener('click', e => { if(e.target === confirmModal) resolveConfirm(false); });
-
-function openSidebarMobile(){ sidebar.classList.add('open'); sbOverlay.classList.add('open'); }
-function closeSidebarMobile(){
-  if(window.innerWidth <= 860){
-    sidebar.classList.remove('open'); sbOverlay.classList.remove('open');
-  }
-}
-sbToggle.addEventListener('click', () => {
-  sidebar.classList.contains('open') ? closeSidebarMobile() : openSidebarMobile();
-});
-sbOverlay.addEventListener('click', closeSidebarMobile);
-
-// Global error handler for Cubism diagnostics
-window.addEventListener('error', (e) => {
-  console.error('[Global Error]', e.message, e.filename, e.lineno, e.colno, e.error);
-});
-window.addEventListener('unhandledrejection', (e) => {
-  console.error('[Unhandled Rejection]', e.reason);
-});
-
-init(false);
-</script>
-</body>
-</html>
+>
