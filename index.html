@@ -907,7 +907,7 @@ window.GallyMergedRuntime = Object.freeze({
   <div class="sb-header">
     <div class="sb-header-top">
       <div class="sb-title">Gall<span>.</span>y</div>
-      <button id="download-folder-btn" title="Download folder (.zip)">
+      <button id="download-folder-btn" type="button" title="Download folder (.zip)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Zip Folder
       </button>
@@ -922,7 +922,7 @@ window.GallyMergedRuntime = Object.freeze({
   </div>
 </aside>
 
-<button id="sb-toggle" aria-label="Toggle folders">
+<button id="sb-toggle" type="button" aria-label="Toggle folders" aria-expanded="false">
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path></svg>
 </button>
 
@@ -3901,66 +3901,29 @@ async function renderCubismViaFramework(framework, model) {
     console.error('[Cubism] GLOBAL Core Moc test:', 'FAIL -', e.message);
   }
 
-  const _originalLoadModel = cubismModel.loadModel;
-  cubismModel.loadModel = function(...args) {
-    console.log('[Cubism] loadModel called with', args.length, 'args:');
-    args.forEach((a, i) => console.log(`  arg[${i}]:`, typeof a, a?.constructor?.name, 'byteLength=', a?.byteLength));
-    try {
-      return _originalLoadModel.apply(this, args);
-    } catch(e) {
-      console.error('[Cubism] loadModel THREW:', e.name, e.message);
-      throw e;
-    }
-  };
-
-  let loadSuccess = false;
-  const loadAttempts = [];
-
-  const signatures = [
-    [mocBuffer, mocBuffer.byteLength],
-    [mocBuffer],
-    [new Uint8Array(mocBuffer)],
-    [new Uint8Array(mocBuffer), new Uint8Array(mocBuffer).byteLength]
-  ];
-
-  for(const sig of signatures) {
-    try {
-      cubismModel.loadModel(...sig);
-      console.log('[Cubism] loadModel succeeded with signature:', sig.map(s => s?.constructor?.name).join(', '));
-      loadSuccess = true;
-      break;
-    } catch(err) {
-      loadAttempts.push({ sig: sig.map(s => s?.constructor?.name).join(', '), error: err.message });
-      console.warn('[Cubism] loadModel failed:', err.message);
-    }
+  // CubismUserModel.loadModel() is not a public Core loader. The framework
+  // method expects the model buffer as its first parameter, so passing an
+  // extra size argument does not repair a Core/framework mismatch and can
+  // shift the framework's internal arguments. Use the framework's documented
+  // one-buffer path first.
+  try {
+    cubismModel.loadModel(mocBuffer);
+  } catch(err) {
+    throw new Error(
+      `Cubism framework rejected the MOC buffer: ${err.message}. ` +
+      `The Core itself can read this MOC, so the failure is inside the bundled framework/runtime pair.`
+    );
   }
 
-  if(!loadSuccess && globalCoreMoc) {
-    console.warn('[Cubism] Attempting emergency direct-Core fallback...');
-    try {
-      cubismModel._moc = globalCoreMoc;
-      if(typeof globalCoreMoc.createModel === 'function') {
-        cubismModel._model = globalCoreMoc.createModel();
-        if(cubismModel._model) loadSuccess = true;
-      }
-    } catch(e) {
-      console.error('[Cubism] Emergency fallback failed:', e);
-    }
-  }
+  const loadedCoreModel = typeof cubismModel.getModel === 'function'
+    ? cubismModel.getModel()
+    : cubismModel._model;
 
-  if(!loadSuccess) {
-    const coreVer = window.Live2DCubismCore?.Version;
-    const coreVerStr = coreVer ? `${coreVer.major || '?'}.${coreVer.minor || '?'}.${coreVer.patch || '?'}` : 'unknown';
-    const attemptSummary = loadAttempts.map(a => `  ${a.sig}: ${a.error}`).join('\n');
-    const diagMsg =
-      `Cubism model loading failed after 4 attempts.\n\n` +
-      `Core version: ${coreVerStr}\n` +
-      `Global Core Moc test: ${globalCoreMoc ? 'PASS' : 'FAIL'}\n` +
-      `Attempts:\n${attemptSummary}\n\n` +
-      `This usually means the bundled cubism-framework.js is incompatible with the loaded Cubism Core. ` +
-      `Please verify that vendor/cubism-framework.js was built against the SAME Core version as the CDN script.`;
-    console.error('[Cubism] FINAL ERROR:', diagMsg);
-    throw new Error(diagMsg);
+  if(!loadedCoreModel) {
+    throw new Error(
+      'Cubism framework loadModel() returned without creating a model. ' +
+      'The bundled cubism-framework.js does not match the runtime API expected by this page.'
+    );
   }
 
   cubismModel.createRenderer(canvas.width, canvas.height);
@@ -4086,6 +4049,22 @@ async function renderCubismViaFramework(framework, model) {
   cubismPlayToggle.classList.add('active');
   cubismActive.raf = requestAnimationFrame(frame);
 }
+
+// ---------- Sidebar controls ----------
+function setSidebarOpen(open){
+  sidebar.classList.toggle('open', open);
+  sbOverlay.classList.toggle('open', open);
+  sbToggle.setAttribute('aria-expanded', String(open));
+}
+if(sbToggle){
+  sbToggle.addEventListener('click', () => setSidebarOpen(!sidebar.classList.contains('open')));
+}
+if(sbOverlay){
+  sbOverlay.addEventListener('click', () => setSidebarOpen(false));
+}
+window.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape') setSidebarOpen(false);
+});
 
 init(false);
 </script>
