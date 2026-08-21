@@ -2466,6 +2466,45 @@ function loadScript(src){
   });
 }
 
+async function fetchArrayBuffer(url, label = "Binary file") {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`${label} failed: HTTP ${response.status}`);
+  }
+  const buffer = await response.arrayBuffer();
+  if (!(buffer instanceof ArrayBuffer)) {
+    throw new Error(`${label} did not return an ArrayBuffer`);
+  }
+  if (buffer.byteLength === 0) {
+    throw new Error(`${label} returned an empty ArrayBuffer`);
+  }
+  return buffer;
+}
+
+async function fetchJson(url, label = "JSON file") {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`${label} failed: HTTP ${response.status}`);
+  }
+  const text = await response.text();
+  if (!text.trim()) {
+    throw new Error(`${label} is empty`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error(`${label} contains invalid JSON: ${error.message}`);
+  }
+}
+
+function bufferInfo(buffer) {
+  return {
+    type: buffer?.constructor?.name,
+    byteLength: buffer?.byteLength
+  };
+}
+
+
 // ---------- Cubism runtime loading ----------
 // Two vendor files, both local (see vendor/ alongside this HTML — not
 // CDN-hotlinked, since Live2D's Core engine isn't published to npm/jsDelivr
@@ -3495,15 +3534,23 @@ async function openCubismPlayer(model){
   if(cubismActiveModelKey !== model.key) return;
 
   cubismSetStatus(`<div class="spinner"></div><div>Loading model…</div>`);
-  try{
+  try {
     await renderCubismModel(framework, model);
     if(cubismActiveModelKey !== model.key) return;
     cubismHideStatus();
     populateCubismMotionButtons(model);
     populateCubismExpressionButtons(model);
-  } catch(e){
+  } catch (e) {
     console.error('Cubism render failed for', model.folderPath, e);
+    console.error(e?.stack || e);
     if(cubismActiveModelKey !== model.key) return;
+    const debugOverlay = document.getElementById("cubism-debug-overlay");
+    if (debugOverlay) {
+      debugOverlay.textContent = `${e.message}
+
+${e.stack || ""}`;
+      debugOverlay.classList.add("visible");
+    }
     cubismSetStatus(`This model failed to render.<br><span style="opacity:0.7;font-size:12px">${(e && e.message) ? e.message : 'Unknown error'}</span>`);
   }
 }
@@ -3564,11 +3611,9 @@ async function renderCubismModel(framework, model){
   const cubismModel = new framework.CubismUserModel();
 
   const mocUrl = RAW_BASE + model.mocPath.split('/').map(encodeURIComponent).join('/');
-  const mocBuffer = await fetch(mocUrl).then(r => {
-    if(!r.ok) throw new Error(`Failed to fetch .moc3 (HTTP ${r.status})`);
-    return r.arrayBuffer();
-  });
-  cubismModel.loadModel(mocBuffer);
+  const mocBuffer = await fetchArrayBuffer(mocUrl, `MOC file ${model.mocPath}`);
+  console.debug("Loading MOC:", bufferInfo(mocBuffer));
+  cubismModel.loadModel(mocBuffer, mocBuffer.byteLength);
 
   // Create the WebGL renderer with the actual backing-buffer dimensions.
   // Passing no dimensions can leave the renderer's render target at an
@@ -3602,15 +3647,30 @@ async function renderCubismModel(framework, model){
     img.src = RAW_BASE + texPath.split('/').map(encodeURIComponent).join('/');
   })));
 
-  if(model.physicsPath){
-    const physicsUrl = RAW_BASE + model.physicsPath.split('/').map(encodeURIComponent).join('/');
-    const buf = await fetch(physicsUrl).then(r => r.arrayBuffer());
-    cubismModel.loadPhysics(buf, buf.byteLength);
+  if (model.physicsPath) {
+    try {
+      const physicsUrl = RAW_BASE + model.physicsPath.split('/').map(encodeURIComponent).join('/');
+      const physicsBuffer = await fetchArrayBuffer(physicsUrl, `Physics file ${model.physicsPath}`);
+      console.debug("Loading physics:", bufferInfo(physicsBuffer));
+      if (typeof cubismModel.loadPhysics === "function") {
+        cubismModel.loadPhysics(physicsBuffer, physicsBuffer.byteLength);
+      }
+    } catch (error) {
+      console.warn("Physics skipped:", error);
+    }
   }
-  if(model.poseJsonPath){
-    const poseUrl = RAW_BASE + model.poseJsonPath.split('/').map(encodeURIComponent).join('/');
-    const buf = await fetch(poseUrl).then(r => r.arrayBuffer());
-    cubismModel.loadPose(buf, buf.byteLength);
+
+  if (model.poseJsonPath) {
+    try {
+      const poseUrl = RAW_BASE + model.poseJsonPath.split('/').map(encodeURIComponent).join('/');
+      const poseBuffer = await fetchArrayBuffer(poseUrl, `Pose file ${model.poseJsonPath}`);
+      console.debug("Loading pose:", bufferInfo(poseBuffer));
+      if (typeof cubismModel.loadPose === "function") {
+        cubismModel.loadPose(poseBuffer, poseBuffer.byteLength);
+      }
+    } catch (error) {
+      console.warn("Pose skipped:", error);
+    }
   }
 
   // Every declared motion is preloaded up front (folder sizes here are
@@ -3618,57 +3678,31 @@ async function renderCubismModel(framework, model){
   // so this is a reasonable tradeoff against the complexity of lazy-
   // loading motions on first play).
   const loadedMotions = {};
-  for(const [groupName, motions] of Object.entries(model.motionGroups)){
-    for(const motion of motions){
+  for (const [groupName, motions] of Object.entries(model.motionGroups)) {
+    for (const motion of motions) {
       const url = RAW_BASE + motion.path.split('/').map(encodeURIComponent).join('/');
-      const buffer = await fetch(url).then(async r => {
-        if(!r.ok) throw new Error(`Failed to fetch motion ${motion.path} (HTTP ${r.status})`);
-        const data = await r.arrayBuffer();
-        if(!data.byteLength) throw new Error(`Motion file is empty: ${motion.path}`);
-        return data;
-      });
-      // CubismUserModel.loadMotion() expects the raw JSON as an ArrayBuffer.
-      // Passing response.text() here can make the framework's JSON parser see
-      // an incomplete/invalid buffer and produce "Unexpected end of JSON input".
       try {
-        // IMPORTANT: enable Cubism's motion consistency validation.
-        // Some motion3.json files have stale/wrong Meta.TotalPointCount or
-        // TotalSegmentCount values. The framework otherwise allocates the
-        // point array from those metadata values and then writes into an
-        // undefined point during parsing, producing:
-        // "Cannot set properties of undefined (setting 'time')".
-        // Passing `true` makes Cubism validate the curve/segment/point
-        // counts before populating the arrays, so bad motions are skipped
-        // instead of aborting the entire Cubism modal.
+        const motionBuffer = await fetchArrayBuffer(url, `Motion ${groupName}/${motion.name}`);
+        console.debug("Loading motion:", { group: groupName, name: motion.name, ...bufferInfo(motionBuffer) });
         const m = cubismModel.loadMotion(
-          buffer,
-          buffer.byteLength,
-          `${groupName}_${motion.name}`,
-          null,
-          null,
-          null,
-          null,
-          null,
-          true
+          motionBuffer,
+          motionBuffer.byteLength,
+          `${groupName}_${motion.name}`
         );
-        if(m) loadedMotions[`${groupName}::${motion.name}`] = m;
-      } catch(err) {
+        if (m) loadedMotions[`${groupName}::${motion.name}`] = m;
+      } catch (err) {
         console.warn(`[Cubism] Skipping invalid motion ${motion.path}:`, err);
       }
     }
   }
 
-  for(const expr of model.expressionPaths){
+  for (const expr of model.expressionPaths) {
     const url = RAW_BASE + expr.path.split('/').map(encodeURIComponent).join('/');
-    const buffer = await fetch(url).then(async r => {
-      if(!r.ok) throw new Error(`Failed to fetch expression ${expr.path} (HTTP ${r.status})`);
-      const data = await r.arrayBuffer();
-      if(!data.byteLength) throw new Error(`Expression file is empty: ${expr.path}`);
-      return data;
-    });
     try {
-      cubismModel.loadExpression(buffer, buffer.byteLength, expr.name);
-    } catch(err) {
+      const expressionBuffer = await fetchArrayBuffer(url, `Expression ${expr.name}`);
+      console.debug("Loading expression:", { expressionName: expr.name, ...bufferInfo(expressionBuffer) });
+      cubismModel.loadExpression(expressionBuffer, expressionBuffer.byteLength, expr.name);
+    } catch (err) {
       console.warn(`[Cubism] Skipping invalid expression ${expr.path}:`, err);
     }
   }
