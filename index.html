@@ -455,6 +455,69 @@
   }
   #l2d-debug-overlay:empty { display: none; }
 
+  #l2d-player #l2d-stage, #cubism-player #cubism-stage {
+    position: absolute; inset: 0; cursor: grab; touch-action: none; overflow: hidden;
+    background:
+      linear-gradient(45deg, #14141d 25%, transparent 25%),
+      linear-gradient(-45deg, #14141d 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #14141d 75%),
+      linear-gradient(-45deg, transparent 75%, #14141d 75%);
+    background-size: 24px 24px, 24px 24px, 24px 24px, 24px 24px;
+    background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+    background-color: #0e0e15;
+  }
+  #cubism-stage::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: rgba(0,0,0,.16);
+  }
+  #cubism-stage.panning { cursor: grabbing; }
+  #cubism-canvas { width: 100%; height: 100%; display: block; position: relative; z-index: 1; }
+  #cubism-status {
+    position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 10px; color: var(--dim); font-size: 13px; text-align: center;
+    padding: 24px; background: rgba(7,7,11,.58); backdrop-filter: blur(3px); pointer-events: none;
+  }
+  #cubism-status.hidden { display: none; }
+  #cubism-status .spinner {
+    width: 30px; height: 30px; border: 3px solid rgba(255,255,255,.1);
+    border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite;
+  }
+  #cubism-player { position: fixed; inset: 0; z-index: 100; display: none; background: #07070b; animation: l2dFadeIn 0.22s ease; overflow: hidden; }
+  #cubism-player.open { display: block; }
+  #cubism-transport-toggle { position: static; z-index: auto; }
+  #cubism-transport-panel {
+    position: fixed; top: 76px; left: 16px; z-index: 111;
+    width: min(320px, calc(100vw - 32px));
+    padding: 12px 13px; border-radius: 15px;
+    background: rgba(17,17,25,.78); border: 1px solid rgba(255,255,255,.09);
+    box-shadow: 0 16px 44px rgba(0,0,0,.4);
+    backdrop-filter: blur(20px) saturate(150%); -webkit-backdrop-filter: blur(20px) saturate(150%);
+    opacity: 0; transform: translateY(-7px) scale(.985); pointer-events: none;
+    transition: opacity .18s ease, transform .18s cubic-bezier(.16,1,.3,1);
+  }
+  #cubism-transport-panel.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+  #cubism-transport-panel .l2d-transport { padding:0; display:flex; align-items:center; gap:9px; }
+  #cubism-drawer {
+    position: fixed; left:18px; right:18px; bottom:18px; z-index:108;
+    width:auto; max-width:1180px; margin:0 auto; max-height:min(54vh, 560px);
+    background:rgba(17,17,25,.82); border:1px solid rgba(255,255,255,.09);
+    border-radius:20px; box-shadow:0 -2px 0 rgba(255,255,255,.02), 0 22px 70px rgba(0,0,0,.48);
+    backdrop-filter:blur(24px) saturate(150%); -webkit-backdrop-filter:blur(24px) saturate(150%);
+    transform:translateY(calc(100% - 54px)); transition:transform .3s cubic-bezier(.16,1,.3,1);
+    display:flex; flex-direction:column; overflow:hidden; padding-bottom:env(safe-area-inset-bottom,0);
+  }
+  #cubism-drawer.open { transform:translateY(0); }
+  #cubism-drawer-handle {
+    position:relative; flex:0 0 54px; display:flex; align-items:center; justify-content:space-between;
+    padding:0 18px; cursor:pointer; user-select:none; color:var(--dim); border-bottom:1px solid transparent;
+  }
+  #cubism-drawer.open #cubism-drawer-handle { border-bottom-color:rgba(255,255,255,.07); }
+  #cubism-drawer-handle::before { content:''; position:absolute; top:8px; left:50%; transform:translateX(-50%); width:34px; height:3px; border-radius:999px; background:rgba(255,255,255,.18); }
+  #cubism-drawer-title { font-size:12px; font-weight:750; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #cubism-drawer-handle > svg { transition:transform .25s ease; margin-top:8px; flex:0 0 auto; }
+  #cubism-drawer.open #cubism-drawer-handle > svg { transform:rotate(180deg); }
+  #cubism-drawer-body { overflow-y:auto; padding:14px 18px 18px; scrollbar-width:thin; }
+
   .l2d-stage-hint {
     position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 7;
     padding: 7px 11px; border-radius: 999px; pointer-events: none;
@@ -984,6 +1047,89 @@
   </div>
 </div>
 
+<div id="cubism-player" aria-label="Cubism viewer">
+  <div class="l2d-topbar">
+    <div class="l2d-model-heading">
+      <div class="l2d-kicker">Cubism Preview</div>
+      <div class="l2d-title-row">
+        <strong id="cubism-model-name">—</strong>
+        <span class="l2d-live-pill">Interactive</span>
+      </div>
+    </div>
+    <div class="l2d-top-actions">
+      <button id="cubism-reset-cam" class="l2d-top-btn" aria-label="Reset camera" title="Reset camera (R)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      </button>
+      <button id="cubism-transport-toggle" class="l2d-top-btn" aria-label="Show playback controls" title="Playback controls (Space)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8V4z"/></svg>
+      </button>
+      <button id="cubism-close" class="l2d-top-btn close" aria-label="Close viewer" title="Close (Esc)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="cubism-transport-panel" aria-label="Playback controls">
+    <div class="l2d-transport-head">
+      <span class="l2d-transport-label">Playback</span>
+      <span class="l2d-transport-shortcut">Space to pause motion</span>
+    </div>
+    <div class="l2d-transport">
+      <button id="cubism-play-toggle" class="l2d-ctrl-btn active" title="Play/Pause motion" aria-label="Play or pause motion"></button>
+    </div>
+  </div>
+
+  <div id="cubism-stage">
+    <canvas id="cubism-canvas"></canvas>
+    <div id="cubism-status"></div>
+  </div>
+  <div class="l2d-stage-hint">Drag to move · Scroll or pinch to zoom · Tap model to interact</div>
+
+  <div id="cubism-drawer">
+    <div id="cubism-drawer-handle" role="button" tabindex="0" aria-expanded="false" aria-controls="cubism-drawer-body">
+      <div class="l2d-drawer-handle-left">
+        <div class="l2d-drawer-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/></svg>
+        </div>
+        <div>
+          <div id="cubism-drawer-title">Model details</div>
+          <div class="l2d-drawer-state">Motions · expressions · model info</div>
+        </div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+    </div>
+    <div id="cubism-drawer-body">
+      <div class="l2d-now-playing-row">
+        <div class="l2d-now-playing">
+          <span>Now playing</span>
+          <b id="cubism-now-playing-name">—</b>
+        </div>
+      </div>
+
+      <div id="cubism-expression-group" class="l2d-variant-group"></div>
+      <div id="cubism-motion-groups"></div>
+
+      <div class="l2d-dev-info">
+        <button class="l2d-dev-info-toggle" id="cubism-dev-info-toggle">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          Technical details
+        </button>
+        <div class="l2d-dev-info-body" id="cubism-dev-info-body">
+          <div class="lb-meta" id="cubism-path"></div>
+          <div class="lb-info" id="cubism-info">
+            <span>Physics: <b id="cubism-has-physics">…</b></span>
+          </div>
+          <div class="lb-actions">
+            <a id="cubism-github" class="lb-icon-btn" href="#" target="_blank" rel="noopener" title="View Source on GitHub">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="confirm-modal">
   <div class="confirm-box">
     <div class="confirm-title" id="confirm-title">Confirm</div>
@@ -1094,7 +1240,8 @@ let rootFolderNames = [];
 const SPINE_SOURCES = [
   { key: 'rolesprefab', prefix: 'rolesstory/rolesprefab/', label: 'rolesprefab' },
   { key: 'roles',       prefix: 'roles/',                  label: 'roles' },
-  { key: 'roles_bust',  prefix: 'roles_bust/',              label: 'roles_bust' }
+  { key: 'roles_bust',  prefix: 'roles_bust/',              label: 'roles_bust' },
+  { key: 'rolescg',     prefix: 'rolesstory/rolescg/',      label: 'rolescg' }
 ];
 // key -> array of models, same shape as before:
 // [{ key, folderPath, name, skelPath, atlasPath, pngPaths:[], version, versionStatus }]
@@ -1114,6 +1261,107 @@ function spineSourceKeyFromPath(path){
 
 // known spine-webgl CDN builds we can load, keyed by "major.minor"
 const SPINE_RUNTIME_VERSIONS = ['3.6', '3.7', '3.8', '4.0', '4.1', '4.2'];
+
+// ---------- Cubism (Live2D proper) models ----------
+// A completely different tech from Spine — different file formats
+// (.model3.json / .moc3 / .motion3.json, not .skel/.atlas), different
+// runtime (Live2D's own Cubism Core + Framework, not spine-webgl), and its
+// own sidebar section rather than folded into Spines. Structured the same
+// way as SPINE_SOURCES for consistency, even though there's currently only
+// one known source folder.
+const CUBISM_SOURCES = [
+  { key: 'live2d_roles', prefix: 'live2d/roles/', label: 'roles' }
+];
+// key -> array of models:
+// [{ key, folderPath, name, modelJsonPath, mocPath, textureUrls:[],
+//    motionGroups:{groupName:[{name,path}]}, expressionPaths:[{name,path}],
+//    physicsPath, poseJsonPath, cdiPath }]
+const cubismModelsBySource = new Map(CUBISM_SOURCES.map(s => [s.key, []]));
+let showingCubismSource = null; // null, or one of CUBISM_SOURCES[].key
+
+function cubismRowPath(sourceKey){ return `__cubism__:${sourceKey}`; }
+function cubismSourceKeyFromPath(path){
+  return typeof path === 'string' && path.startsWith('__cubism__:') ? path.slice('__cubism__:'.length) : null;
+}
+
+// Cubism model discovery works differently from Spine's: rather than
+// bucketing by folder-and-file-extension and guessing at how files pair up
+// (necessary for Spine, since .skel/.atlas pairing conventions genuinely
+// vary — confirmed across this repo's own folders), each Cubism model
+// folder has exactly one .model3.json manifest that explicitly declares
+// every other file it needs (Moc, Textures, Motions, Expressions, Physics,
+// Pose) as relative paths. That manifest is authoritative, so discovery
+// just needs to find each manifest and fetch+parse it — no guessing.
+async function discoverCubismModels(tree){
+  for(const source of CUBISM_SOURCES){
+    const manifestPaths = tree
+      .filter(item => item.type === 'blob' && item.path.startsWith(source.prefix) && /\.model3\.json$/i.test(item.path))
+      .map(item => item.path);
+
+    const models = [];
+    // Fetched in parallel but the manifest count per source is small
+    // (one per character folder), so this doesn't need batching the way
+    // per-image work elsewhere in this file sometimes does.
+    await Promise.all(manifestPaths.map(async modelJsonPath => {
+      const folderPath = modelJsonPath.substring(0, modelJsonPath.lastIndexOf('/'));
+      const folderName = folderPath.split('/').pop();
+      try{
+        const manifestUrl = RAW_BASE + modelJsonPath.split('/').map(encodeURIComponent).join('/');
+        const manifest = await fetch(manifestUrl).then(r => {
+          if(!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        });
+        const refs = manifest.FileReferences || {};
+        if(!refs.Moc) return; // not a usable model without a .moc3 reference
+
+        const resolve = (relPath) => folderPath + '/' + relPath;
+
+        const textureUrls = (refs.Textures || []).map(resolve);
+
+        // Motions can be grouped (e.g. "Idle", "TapBody") or flat under a
+        // single "" group, as seen in 300401_hongnujian's manifest (25
+        // motions all under the "" key) — both are valid per the format,
+        // so this preserves whatever grouping the manifest itself declares
+        // rather than assuming one shape.
+        const motionGroups = {};
+        Object.entries(refs.Motions || {}).forEach(([groupName, entries]) => {
+          motionGroups[groupName] = (entries || [])
+            .filter(e => e && e.File)
+            .map(e => ({
+              name: e.File.split('/').pop().replace(/\.motion3\.json$/i, ''),
+              path: resolve(e.File)
+            }));
+        });
+
+        const expressionPaths = (refs.Expressions || [])
+          .filter(e => e && e.File)
+          .map(e => ({
+            name: e.Name || e.File.split('/').pop().replace(/\.exp3\.json$/i, ''),
+            path: resolve(e.File)
+          }));
+
+        models.push({
+          key: folderPath,
+          folderPath,
+          name: folderName,
+          modelJsonPath,
+          mocPath: resolve(refs.Moc),
+          textureUrls,
+          motionGroups,
+          expressionPaths,
+          physicsPath: refs.Physics ? resolve(refs.Physics) : null,
+          poseJsonPath: refs.Pose ? resolve(refs.Pose) : null,
+          cdiPath: refs.DisplayInfo ? resolve(refs.DisplayInfo) : null
+        });
+      } catch(e){
+        console.warn(`Failed to load Cubism manifest for ${folderPath}`, e);
+      }
+    }));
+
+    models.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric:true}));
+    cubismModelsBySource.set(source.key, models);
+  }
+}
 
 function showLoadingState(){
   stateOverlay.className = 'active';
@@ -1176,6 +1424,7 @@ async function init(forceRefresh){
       });
 
     discoverLive2DModels(tree);
+    await discoverCubismModels(tree);
 
     buildFolderTree();
     renderTree();
@@ -1210,7 +1459,7 @@ if(treeRefreshLink){
 
 function discoverLive2DModels(tree){
   SPINE_SOURCES.forEach(source => {
-    const buckets = new Map(); // folderPath -> { skels:[], atlas, pngs:[] }
+    const buckets = new Map(); // folderPath -> { skels:[], atlases:[], pngs:[] }
 
     tree.forEach(item => {
       if(item.type !== 'blob') return;
@@ -1220,7 +1469,7 @@ function discoverLive2DModels(tree){
       const fileName = parts[parts.length - 1];
       const folderPath = parts.slice(0, -1).join('/');
 
-      if(!buckets.has(folderPath)) buckets.set(folderPath, { skels: [], pngs: [] });
+      if(!buckets.has(folderPath)) buckets.set(folderPath, { skels: [], atlases: [], pngs: [] });
       const bucket = buckets.get(folderPath);
 
       if(/\.skel$/i.test(fileName)){
@@ -1232,21 +1481,57 @@ function discoverLive2DModels(tree){
         // tree scan happened to encounter last.
         bucket.skels.push(item.path);
       } else if(/\.atlas$/i.test(fileName)){
-        bucket.atlas = item.path;
+        // A folder can ALSO hold multiple atlases, one per skeleton variant
+        // — confirmed directly in roles/300101_zhujue/, which has BOTH
+        // 300101_zhujue.atlas (512x512 page) AND
+        // 300101_zhujue_fight.atlas (1764x144 page) with the SAME 76
+        // region names but completely different x/y coordinates in each
+        // (verified region-by-region). Blindly sharing one atlas across
+        // every skeleton in the folder — like 634103_jiexika3's case,
+        // where it's genuinely correct — silently produced a garbled
+        // render here: every region sampled from the wrong page's pixel
+        // coordinates. Every atlas found is now kept, matched to its
+        // skeleton by filename stem below, instead of just keeping
+        // whichever one the tree scan happened to encounter last.
+        bucket.atlases.push(item.path);
       } else if(/\.png$/i.test(fileName)){
         bucket.pngs.push(item.path);
       }
     });
 
     // Bucketing is purely "same folder" — deliberately NOT matching skel/
-    // atlas by file base name. Different Spine sources in this repo name
-    // their files differently (rolesstory/rolesprefab pairs
-    // 300301_hujisheng_p.skel with a same-stem .atlas, while roles/ pairs
-    // one or more differently-stemmed .skel files — e.g. "..._ui.skel" —
-    // with a single unsuffixed shared .atlas in the same folder). One
-    // folder is trusted to hold exactly one atlas shared by all skeletons
-    // found in it.
-    //
+    // atlas by file base name for GROUPING (different Spine sources name
+    // their files differently), but WITHIN a folder, a skeleton's stem is
+    // now used to pick its best-matching atlas: same-stem atlas first
+    // (e.g. "..._fight.skel" prefers "..._fight.atlas" if one exists),
+    // falling back to a single shared/unsuffixed atlas when no stem match
+    // exists (the 634103_jiexika3 case — one atlas legitimately serves
+    // every variant there).
+    function pickAtlasForSkel(skelPath, atlases, folderName){
+      const skelStem = skelPath.split('/').pop().replace(/\.skel$/i, '');
+      const sameStem = atlases.find(a => a.split('/').pop().replace(/\.atlas$/i, '') === skelStem);
+      const unsuffixed = atlases.find(a => a.split('/').pop().replace(/\.atlas$/i, '') === folderName);
+      if(sameStem){
+        // Prefer the same-stem atlas, but also record the unsuffixed one
+        // (when it exists and differs) as a fallback: verified directly in
+        // roles/300101_zhujue/, a same-stem atlas can be stale — packed
+        // against a texture sheet that's since been replaced (there,
+        // 300101_zhujue_fight.atlas is ~2 years older than the skeleton
+        // and every other file in the folder, and declares a page size
+        // that doesn't match the PNG actually present). renderSpineModel's
+        // texture-size sanity check will catch that mismatch at load time
+        // and retry with this fallback rather than just failing outright.
+        const fallback = (unsuffixed && unsuffixed !== sameStem) ? unsuffixed : null;
+        return { atlasPath: sameStem, fallbackAtlasPath: fallback };
+      }
+      // No exact-stem match: prefer an unsuffixed atlas (stem equals the
+      // folder name) if present, else just the first found — this only
+      // matters when there's more than one atlas AND none match the
+      // skeleton's own stem, which shouldn't normally happen but a
+      // deterministic fallback beats an arbitrary one.
+      return { atlasPath: unsuffixed || atlases[0], fallbackAtlasPath: null };
+    }
+
     // One model entry per FOLDER (not per skeleton) — a folder with several
     // skeletons (e.g. roles/634103_jiexika3/ holding _fight.skel, _room.skel,
     // _ui.skel) is one character with several playable variants, not
@@ -1254,16 +1539,26 @@ function discoverLive2DModels(tree){
     // near-duplicate entries for the same character. Every skeleton found
     // is kept, in model.skelVariants, so the player can switch between them
     // without losing any of them — the sort below just decides which one
-    // loads first when the card is opened.
+    // loads first when the card is opened. Each variant now carries its
+    // OWN atlasPath (see pickAtlasForSkel above) rather than one shared at
+    // the model level, since that sharing assumption doesn't always hold.
     const models = [];
     buckets.forEach((files, folderPath) => {
       // only a genuine Spine model folder if it has at least one skeleton,
-      // an atlas, and texture pages
-      if(files.skels.length === 0 || !files.atlas || files.pngs.length === 0) return;
+      // at least one atlas, and texture pages
+      if(files.skels.length === 0 || files.atlases.length === 0 || files.pngs.length === 0) return;
       const folderName = folderPath.split('/').pop();
 
       const skelVariants = files.skels
-        .map(skelPath => ({ path: skelPath, label: skelPath.split('/').pop().replace(/\.skel$/i, '') }))
+        .map(skelPath => {
+          const picked = pickAtlasForSkel(skelPath, files.atlases, folderName);
+          return {
+            path: skelPath,
+            label: skelPath.split('/').pop().replace(/\.skel$/i, ''),
+            atlasPath: picked.atlasPath,
+            fallbackAtlasPath: picked.fallbackAtlasPath
+          };
+        })
         .sort((a, b) => a.label.localeCompare(b.label, undefined, {numeric:true}));
 
       // Default to whichever skeleton's stem exactly matches the folder
@@ -1278,8 +1573,9 @@ function discoverLive2DModels(tree){
         folderPath,
         name: folderName,
         skelPath: defaultVariant.path,
+        atlasPath: defaultVariant.atlasPath,
+        fallbackAtlasPath: defaultVariant.fallbackAtlasPath,
         skelVariants,
-        atlasPath: files.atlas,
         pngPaths: files.pngs,
         version: null,
         versionStatus: 'unknown' // unknown | detecting | detected | unsupported | failed
@@ -1503,6 +1799,25 @@ function renderTree(){
     });
   }
 
+  const totalCubismModels = CUBISM_SOURCES.reduce((sum, s) => sum + cubismModelsBySource.get(s.key).length, 0);
+  if(totalCubismModels > 0){
+    const divider4 = document.createElement('div');
+    divider4.className = 'tdivider';
+    treeEl.appendChild(divider4);
+
+    const cubismLabel = document.createElement('div');
+    cubismLabel.className = 'tsection-label';
+    cubismLabel.textContent = 'Cubism';
+    treeEl.appendChild(cubismLabel);
+
+    CUBISM_SOURCES.forEach(source => {
+      const count = cubismModelsBySource.get(source.key).length;
+      if(count > 0){
+        treeEl.appendChild(makeSimpleRow(source.label, cubismRowPath(source.key), count, 'live2d'));
+      }
+    });
+  }
+
   const divider2 = document.createElement('div');
   divider2.className = 'tdivider';
   treeEl.appendChild(divider2);
@@ -1615,7 +1930,8 @@ function toggleFolder(path){
 function selectFolder(path){
   selectedFolder = path;
   showingSpineSource = spineSourceKeyFromPath(path);
-  if(path && path !== '__pinned__' && !showingSpineSource && !PINNED_FOLDER_PATHS.includes(path)){
+  showingCubismSource = cubismSourceKeyFromPath(path);
+  if(path && path !== '__pinned__' && !showingSpineSource && !showingCubismSource && !PINNED_FOLDER_PATHS.includes(path)){
     const parts = path.split('/');
     let acc = [];
     for(let i = 0; i < parts.length - 1; i++){
@@ -1632,6 +1948,11 @@ function applyFilters(){
   if(showingSpineSource){
     downloadFolderBtn.style.display = 'none';
     applyLive2DFilters(showingSpineSource);
+    return;
+  }
+  if(showingCubismSource){
+    downloadFolderBtn.style.display = 'none';
+    applyCubismFilters(showingCubismSource);
     return;
   }
   downloadFolderBtn.style.display = '';
@@ -1728,6 +2049,71 @@ function renderLive2DCard(model){
   return cell;
 }
 
+function applyCubismFilters(sourceKey){
+  const source = CUBISM_SOURCES.find(s => s.key === sourceKey);
+  const models = cubismModelsBySource.get(sourceKey) || [];
+  const q = searchQuery.trim().toLowerCase();
+  const list = q ? models.filter(m => m.name.toLowerCase().includes(q) || m.folderPath.toLowerCase().includes(q)) : models;
+
+  // Same defense-in-depth as applyLive2DFilters — see that function's
+  // comment for why this matters.
+  filtered = [];
+  renderedCount = 0;
+
+  grid.innerHTML = '';
+  grid.classList.add('live2d-grid');
+  emptyEl.style.display = list.length === 0 ? 'block' : 'none';
+  emptyEl.textContent = 'No Cubism models match your search.';
+  const label = source ? source.label : 'Cubism';
+  crumbEl.innerHTML = `<b>${label}</b> <span style="opacity:0.6;font-size:13px;padding-left:8px">— ${list.length.toLocaleString()} model${list.length===1?'':'s'}</span>`;
+
+  const fragment = document.createDocumentFragment();
+  list.forEach(model => fragment.appendChild(renderCubismCard(model)));
+  grid.appendChild(fragment);
+}
+
+function renderCubismCard(model){
+  const cell = document.createElement('div');
+  cell.className = 'cell live2d-cell';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'thumb-wrap';
+
+  const imEl = document.createElement('img');
+  imEl.loading = 'lazy';
+  imEl.decoding = 'async';
+  imEl.alt = model.name;
+  imEl.addEventListener('load', () => imEl.classList.add('loaded'));
+  wrap.appendChild(imEl);
+
+  // Unlike Spine's atlas format, Cubism has no single "page" texture that
+  // makes a natural thumbnail — a model can have several equally-valid
+  // texture sheets (body, face, effects, etc. — confirmed directly:
+  // 300401_hongnujian's manifest lists 4). Using the first declared
+  // texture is a plain, honest crop rather than a curated preview, but
+  // it's a real texture from the model, not a placeholder — consistent
+  // with how a missing/failed Spine preview already falls back to
+  // "whatever's available" rather than blocking the card entirely.
+  if(model.textureUrls[0]){
+    imEl.src = RAW_BASE + model.textureUrls[0].split('/').map(encodeURIComponent).join('/');
+  }
+
+  const badge = document.createElement('span');
+  badge.className = 'play-badge';
+  badge.innerHTML = LIVE2D_SVG + ' Cubism';
+  wrap.appendChild(badge);
+
+  cell.appendChild(wrap);
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'name';
+  nameEl.textContent = model.name;
+  cell.appendChild(nameEl);
+
+  cell.addEventListener('click', () => openCubismPlayer(model));
+  return cell;
+}
+
 function renderNextBatch(){
   // The IntersectionObserver watching #sentinel below is registered once
   // and stays active for the page's whole lifetime — it has no way to know
@@ -1740,7 +2126,7 @@ function renderNextBatch(){
   // append its (unrelated) image cards straight into the Spine grid.
   // Confirmed as the actual cause of stray atlassrc/ui_modules/... cards
   // appearing in the roles_bust view after visiting "All" first.
-  if(showingSpineSource) return;
+  if(showingSpineSource || showingCubismSource) return;
   const slice = filtered.slice(renderedCount, renderedCount + BATCH);
   if(slice.length === 0) return;
 
@@ -1909,6 +2295,144 @@ function l2dHideStatus(){
   l2dStatus.classList.add('hidden');
 }
 
+// Shared pointer-pan / pinch-zoom / wheel-zoom camera, used by both the
+// Spine and Cubism players against their own canvas+stage pair. Generic
+// screen<->world math with no renderer-specific assumptions: callers
+// supply `bounds` (world-space size/offset to fit) and a mutable `camView`
+// object ({offsetX, offsetY, zoom}) that the caller's own render loop
+// reads each frame — this function only ever writes to it in response to
+// user input, it doesn't render anything itself.
+// Returns { resetCamera, teardown } — teardown removes every listener this
+// call added, so repeated open/close of a player doesn't accumulate
+// listeners on the (reused) stage/canvas elements.
+function setupCameraForStage({ stage, canvas, resetBtn, bounds, homeCenter, boundsAspect, camPad, camView }){
+  function resetCamera(){
+    camView.offsetX = 0;
+    camView.offsetY = 0;
+    camView.zoom = 1;
+  }
+  resetBtn.onclick = resetCamera;
+
+  const pointers = new Map();
+  let pinchStartDist = 0;
+  let pinchStartZoom = 1;
+  let lastPanX = 0, lastPanY = 0;
+
+  function stagePxToWorld(px){
+    const canvasAspect = canvas.width / canvas.height;
+    let viewH = bounds.size.y * camPad / camView.zoom;
+    let viewW = viewH * canvasAspect;
+    if (canvasAspect <= boundsAspect) {
+      viewW = bounds.size.x * camPad / camView.zoom;
+      viewH = viewW / canvasAspect;
+    }
+    return px * (viewW / canvas.clientWidth);
+  }
+
+  function baseViewSize(){
+    const canvasAspect = canvas.width / canvas.height;
+    let viewW, viewH;
+    if (canvasAspect > boundsAspect) {
+      viewH = bounds.size.y * camPad;
+      viewW = viewH * canvasAspect;
+    } else {
+      viewW = bounds.size.x * camPad;
+      viewH = viewW / canvasAspect;
+    }
+    return { viewW, viewH };
+  }
+
+  function screenToWorld(clientX, clientY){
+    const rect = canvas.getBoundingClientRect();
+    const nx = (clientX - rect.left) / rect.width - 0.5;
+    const ny = (clientY - rect.top) / rect.height - 0.5;
+    const { viewW, viewH } = baseViewSize();
+    const centerX = homeCenter.x + camView.offsetX;
+    const centerY = homeCenter.y + camView.offsetY;
+    return {
+      x: centerX + nx * (viewW / camView.zoom),
+      y: centerY - ny * (viewH / camView.zoom)
+    };
+  }
+
+  function zoomAround(clientX, clientY, newZoom){
+    newZoom = Math.min(8, Math.max(0.2, newZoom));
+    const before = screenToWorld(clientX, clientY);
+    camView.zoom = newZoom;
+    const after = screenToWorld(clientX, clientY);
+    camView.offsetX += before.x - after.x;
+    camView.offsetY += before.y - after.y;
+  }
+
+  function onPointerDown(e){
+    if(e.target.closest('.l2d-status-like, #l2d-status, #cubism-status')) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    stage.setPointerCapture(e.pointerId);
+    if(pointers.size === 1){
+      stage.classList.add('panning');
+      lastPanX = e.clientX; lastPanY = e.clientY;
+    } else if(pointers.size === 2){
+      const pts = [...pointers.values()];
+      pinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      pinchStartZoom = camView.zoom;
+    }
+  }
+  function onPointerMove(e){
+    if(!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if(pointers.size === 1){
+      const dx = e.clientX - lastPanX;
+      const dy = e.clientY - lastPanY;
+      lastPanX = e.clientX; lastPanY = e.clientY;
+      camView.offsetX -= stagePxToWorld(dx);
+      camView.offsetY += stagePxToWorld(dy);
+    } else if(pointers.size === 2){
+      const pts = [...pointers.values()];
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      const midX = (pts[0].x + pts[1].x) / 2;
+      const midY = (pts[0].y + pts[1].y) / 2;
+      if(pinchStartDist > 0){
+        zoomAround(midX, midY, pinchStartZoom * (dist / pinchStartDist));
+      }
+    }
+  }
+  function releasePointer(e){
+    pointers.delete(e.pointerId);
+    if(pointers.size === 0) stage.classList.remove('panning');
+    if(pointers.size < 2) pinchStartDist = 0;
+    if(pointers.size === 1){
+      const [remaining] = pointers.values();
+      lastPanX = remaining.x;
+      lastPanY = remaining.y;
+      stage.classList.add('panning');
+    }
+  }
+  function onWheel(e){
+    e.preventDefault();
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    zoomAround(e.clientX, e.clientY, camView.zoom * factor);
+  }
+
+  stage.addEventListener('pointerdown', onPointerDown);
+  stage.addEventListener('pointermove', onPointerMove);
+  stage.addEventListener('pointerup', releasePointer);
+  stage.addEventListener('pointercancel', releasePointer);
+  stage.addEventListener('pointerleave', releasePointer);
+  stage.addEventListener('wheel', onWheel, { passive: false });
+
+  function teardown(){
+    stage.removeEventListener('pointerdown', onPointerDown);
+    stage.removeEventListener('pointermove', onPointerMove);
+    stage.removeEventListener('pointerup', releasePointer);
+    stage.removeEventListener('pointercancel', releasePointer);
+    stage.removeEventListener('pointerleave', releasePointer);
+    stage.removeEventListener('wheel', onWheel);
+    resetBtn.onclick = null;
+  }
+
+  return { resetCamera, teardown };
+}
+
 function loadScript(src){
   return new Promise((resolve, reject) => {
     const el = document.createElement('script');
@@ -1917,6 +2441,42 @@ function loadScript(src){
     el.onerror = () => reject(new Error(`Failed to load ${src}`));
     document.head.appendChild(el);
   });
+}
+
+// ---------- Cubism runtime loading ----------
+// Two vendor files, both local (see vendor/ alongside this HTML — not
+// CDN-hotlinked, since Live2D's Core engine isn't published to npm/jsDelivr
+// the way spine-webgl is, and self-hosting is the license-consistent
+// approach for a proprietary SDK like this):
+//   - vendor/live2dcubismcore.min.js: Live2D's own prebuilt Core engine,
+//     a classic global-scope script (defines window.Live2DCubismCore).
+//     Explicitly listed as redistributable in the SDK's own
+//     RedistributableFiles.txt.
+//   - vendor/cubism-framework.js: the SDK's Framework source, which ships
+//     as 59 separate TypeScript files with no prebuilt browser bundle —
+//     compiled and bundled into one ES module ahead of time (esbuild),
+//     re-exporting the same set of classes Live2D's own official Demo
+//     sample (Samples/TypeScript/Demo) uses. Framework genuinely depends
+//     on Core being loaded and initialized FIRST (it reads
+//     window.Live2DCubismCore internally), so these load in sequence, not
+//     in parallel.
+let cubismRuntimePromise = null;
+function loadCubismRuntime(){
+  if(cubismRuntimePromise) return cubismRuntimePromise;
+  cubismRuntimePromise = (async () => {
+    if(typeof window.Live2DCubismCore === 'undefined'){
+      await loadScript('vendor/live2dcubismcore.min.js');
+    }
+    if(typeof window.Live2DCubismCore === 'undefined'){
+      throw new Error('Live2D Cubism Core failed to load.');
+    }
+    const framework = await import('./vendor/cubism-framework.js');
+    if(!framework.CubismFramework){
+      throw new Error('Cubism Framework bundle is missing expected exports.');
+    }
+    return framework;
+  })();
+  return cubismRuntimePromise;
 }
 
 // Loads the spine-webgl runtime for a model. Prefers the EXACT patch version
@@ -1983,6 +2543,31 @@ function normalizeSpineNamespace(spineNS){
   return spineNS;
 }
 
+// Verifies the runtime that actually loaded matches the major version we
+// asked for, using spineNS.Physics as the signal: confirmed directly by
+// reading source that Physics is a 4.2+ addition and genuinely does not
+// exist on the 3.8 branch build at all. This exists because jsDelivr's
+// GitHub-file mirror behavior for a bare branch ref
+// (cdn.jsdelivr.net/gh/<owner>/<repo>@3.8/<path>) could not be verified
+// from this environment (jsdelivr.net isn't reachable from the sandbox
+// this was written in) — if that URL pattern ever resolves to something
+// other than the intended 3.8 branch build (a redirect, a cache pointing
+// at a different ref, master, etc.), the symptom would otherwise be a
+// confusing downstream error deep inside skeleton parsing (e.g. "String in
+// string table must not be null" — which is real 4.2 source, not 3.8) with
+// no indication that the wrong script was ever the actual cause.
+function verifyRuntimeVersionMatch(spineNS, requestedVersionSpec){
+  const isLegacyRequest = LEGACY_SPINE_VERSIONS.has(requestedVersionSpec);
+  const looksLike4Plus = typeof spineNS.Physics !== 'undefined';
+  if(isLegacyRequest && looksLike4Plus){
+    throw new Error(
+      `Requested the Spine ${requestedVersionSpec} runtime, but the script that loaded looks like a ` +
+      `4.x build instead (it defines spineNS.Physics, which doesn't exist before 4.2). The CDN likely ` +
+      `served the wrong file for this version.`
+    );
+  }
+}
+
 // Tracks which version string is currently loaded into the shared
 // window.spine global, so we can tell a genuine cache-hit (same version
 // requested again — reuse it) apart from a version switch (different
@@ -2020,6 +2605,7 @@ function loadSpineRuntime(runtimeKey, exactVersion){
     if(typeof window.spine === 'undefined'){
       throw new Error('Runtime loaded but window.spine is missing');
     }
+    verifyRuntimeVersionMatch(window.spine, versionSpec);
     loadedSpineVersion = versionSpec;
     return normalizeSpineNamespace(window.spine);
   }
@@ -2099,6 +2685,15 @@ function renderVariantSwitcher(model){
       // freshly-discovered model would.
       openLive2DPlayer(Object.assign({}, model, {
         skelPath: variant.path,
+        // Each variant can need a DIFFERENT atlas now (see pickAtlasForSkel
+        // in discoverLive2DModels) — 634103_jiexika3's variants genuinely
+        // share one, but 300101_zhujue's _fight variant needs its own
+        // (same 76 region names, completely different pixel coordinates on
+        // a differently-sized page; using the wrong one silently rendered
+        // a garbled/fragmented model instead of erroring). Must swap this
+        // alongside skelPath, not just skelPath alone.
+        atlasPath: variant.atlasPath,
+        fallbackAtlasPath: variant.fallbackAtlasPath,
         version: null,
         runtimeKey: undefined,
         versionStatus: 'unknown'
@@ -2170,6 +2765,14 @@ async function openLive2DPlayer(model){
   }
 }
 
+// Thrown specifically when a texture's real loaded size doesn't match what
+// its atlas file declares (see loadAtlasAndTextures inside renderSpineModel)
+// — a distinct subclass, rather than a plain Error, so renderSpineModel can
+// catch exactly this case and retry with model.fallbackAtlasPath instead of
+// swallowing every other kind of failure (network errors, genuinely missing
+// files) into the same silent-retry path.
+class TextureSizeMismatchError extends Error {}
+
 async function renderSpineModel(spineNS, model){
   const canvas = l2dCanvas;
   const dpr = window.devicePixelRatio || 1;
@@ -2192,17 +2795,6 @@ async function renderSpineModel(spineNS, model){
   const gl = canvas.getContext('webgl', { alpha: true, stencil: true }) || canvas.getContext('experimental-webgl', { alpha: true, stencil: true });
   if(!gl) throw new Error('WebGL is not available in this browser.');
 
-  const skelUrl = RAW_BASE + model.skelPath.split('/').map(encodeURIComponent).join('/');
-  const atlasUrl = RAW_BASE + model.atlasPath.split('/').map(encodeURIComponent).join('/');
-  const atlasDir = model.atlasPath.substring(0, model.atlasPath.lastIndexOf('/') + 1);
-
-  const [skelRes, atlasText] = await Promise.all([
-    fetch(skelUrl).then(r => { if(!r.ok) throw new Error(`Failed to fetch skeleton (HTTP ${r.status})`); return r.arrayBuffer(); }),
-    fetch(atlasUrl).then(r => { if(!r.ok) throw new Error(`Failed to fetch atlas (HTTP ${r.status})`); return r.text(); })
-  ]);
-
-  // Load atlas pages (textures) referenced by the .atlas file.
-  //
   // Verified empirically (sampled RGBA pixels along semi-transparent edges of
   // a real exported atlas PNG from this asset source): several pixels have
   // max(R,G,B) > A (e.g. RGBA 238,145,121,32) — only possible with STRAIGHT
@@ -2228,33 +2820,129 @@ async function renderSpineModel(spineNS, model){
   // A prior version of this comment assumed GLTexture premultiplies
   // automatically by default; that was never true, which is why the
   // white-edge artifact persisted through that fix attempt. We now set the
-  // pixelStorei flag ourselves, immediately before each texture upload, so
-  // we don't depend on GLTexture's internal behavior in any given version.
+  // pixelStorei flag ourselves, immediately before each texture upload (see
+  // fetchTexture inside loadAtlasAndTextures below), so we don't depend on
+  // GLTexture's internal behavior in any given version.
   spineNS.GLTexture.DISABLE_UNPACK_PREMULTIPLIED_ALPHA_WEBGL = false;
 
-  const textureLoader = (path) => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-        const tex = new spineNS.GLTexture(gl, img);
-        resolve(tex);
-      };
-      img.onerror = () => reject(new Error(`Failed to load texture: ${path}`));
-      img.src = RAW_BASE + (atlasDir + path).split('/').map(encodeURIComponent).join('/');
-    });
-  };
+  const skelUrl = RAW_BASE + model.skelPath.split('/').map(encodeURIComponent).join('/');
 
-  const atlasPages = parseAtlasPageNames(atlasText);
-  const textures = {};
-  await Promise.all(atlasPages.map(async pageName => {
-    textures[pageName] = await textureLoader(pageName);
-  }));
+  const skelResPromise = fetch(skelUrl).then(r => { if(!r.ok) throw new Error(`Failed to fetch skeleton (HTTP ${r.status})`); return r.arrayBuffer(); });
 
-  const atlas = new spineNS.TextureAtlas(atlasText);
+  // Loads one atlas (text + all its declared texture pages) and validates
+  // each page's real loaded size against what the atlas declares. Wrapped
+  // in a function (rather than inline, as before) so it can be retried
+  // against model.fallbackAtlasPath below if the primary atlas turns out
+  // to be stale/mismatched — see pickAtlasForSkel in discoverLive2DModels
+  // and the TextureSizeMismatchError comment further down for why that
+  // situation is real and confirmed, not hypothetical.
+  async function loadAtlasAndTextures(atlasPath){
+    const atlasUrl = RAW_BASE + atlasPath.split('/').map(encodeURIComponent).join('/');
+    const atlasDir = atlasPath.substring(0, atlasPath.lastIndexOf('/') + 1);
+    const atlasText = await fetch(atlasUrl).then(r => { if(!r.ok) throw new Error(`Failed to fetch atlas (HTTP ${r.status})`); return r.text(); });
+
+    // Extracts each declared page's size (from its "size:"/"size " header
+    // line, following the page name) as {width, height}, keyed by page name.
+    // Used only to sanity-check the texture actually loaded for that page —
+    // see fetchTexture below — since a page's declared size and its real
+    // loaded image size can legitimately disagree when an atlas file was
+    // packed against a texture sheet that isn't the one actually present
+    // under that filename (confirmed directly: roles/300101_zhujue/'s
+    // _fight.atlas declares "300101_zhujue.png" at 1764x144, but the only
+    // PNG that actually exists in that folder under that name is 512x512 —
+    // a genuine mismatch in the source repository itself: that atlas file
+    // is ~2 years older than the skeleton and every other file in the
+    // folder, left over from before a later re-export replaced the texture
+    // sheet without updating/removing the stale per-variant atlas).
+    // Without this check, region coordinates get computed against the
+    // wrong page dimensions and the render comes out as fragmented/garbled
+    // geometry with no error at all, which is far harder to diagnose than
+    // a clear upfront message — and now, further down, this also drives an
+    // automatic retry against the fallback atlas rather than just failing.
+    function parseAtlasPageSizes(text){
+      const lines = text.split(/\r?\n/);
+      const sizes = {};
+      for(let i = 0; i < lines.length - 1; i++){
+        const line = lines[i].trim();
+        const next = lines[i + 1].trim();
+        const m = next.match(/^size:\s*(\d+)\s*,\s*(\d+)/);
+        // A page name line is followed directly by its size line in both
+        // the modern and deprecated atlas formats alike.
+        if(m && line && !line.includes(':')){
+          sizes[line] = { width: parseInt(m[1], 10), height: parseInt(m[2], 10) };
+        }
+      }
+      return sizes;
+    }
+    const atlasPageSizes = parseAtlasPageSizes(atlasText);
+
+    const fetchTexture = (path) => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          const declared = atlasPageSizes[path];
+          if(declared && (declared.width !== img.naturalWidth || declared.height !== img.naturalHeight)){
+            reject(new TextureSizeMismatchError(
+              `Texture size mismatch for "${path}": atlas declares ${declared.width}x${declared.height}, ` +
+              `but the loaded image is ${img.naturalWidth}x${img.naturalHeight}. This model's atlas file was ` +
+              `packed against a different texture sheet than the one present under this name in the source repo.`
+            ));
+            return;
+          }
+          gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+          const tex = new spineNS.GLTexture(gl, img);
+          resolve(tex);
+        };
+        img.onerror = () => reject(new Error(`Failed to load texture: ${path}`));
+        img.src = RAW_BASE + (atlasDir + path).split('/').map(encodeURIComponent).join('/');
+      });
+    };
+
+    const atlasPages = parseAtlasPageNames(atlasText);
+    const textures = {};
+    await Promise.all(atlasPages.map(async pageName => {
+      textures[pageName] = await fetchTexture(pageName);
+    }));
+
+    return { atlasText, textures };
+  }
+
+  let atlasText, textures;
+  try{
+    ({ atlasText, textures } = await loadAtlasAndTextures(model.atlasPath));
+  } catch(err){
+    if(err instanceof TextureSizeMismatchError && model.fallbackAtlasPath){
+      console.warn(`Primary atlas mismatched for ${model.folderPath}, retrying with fallback atlas`, err);
+      ({ atlasText, textures } = await loadAtlasAndTextures(model.fallbackAtlasPath));
+    } else {
+      throw err;
+    }
+  }
+
+  const skelRes = await skelResPromise;
+
+  // TextureAtlas's constructor signature genuinely differs between major
+  // versions — verified directly against both branches' actual source:
+  //   4.2: constructor(atlasText: string)                          — pages
+  //        get their texture attached manually afterward (the
+  //        atlas.pages.forEach(...) loop below).
+  //   3.8: constructor(atlasText: string, textureLoader: (path) => any)
+  //        — textureLoader is REQUIRED (throws "textureLoader cannot be
+  //        null" otherwise) and is called SYNCHRONOUSLY during
+  //        construction itself (page.texture = textureLoader(line); the
+  //        very next line calls .setFilters() on whatever that returned,
+  //        so it cannot be a Promise).
+  // Passing this second argument unconditionally satisfies both: 4.2's
+  // constructor simply ignores an extra argument it doesn't declare (JS,
+  // unlike the TS signature, doesn't error on that), while 3.8 requires
+  // and calls it. Since every page was already fetched above via
+  // Promise.all before this line runs, a synchronous map lookup here is
+  // always valid — nothing is actually loaded asynchronously at this point.
+  const syncTextureLookup = (path) => textures[path];
+  const atlas = new spineNS.TextureAtlas(atlasText, syncTextureLookup);
   atlas.pages.forEach(page => {
-    if(textures[page.name]) page.setTexture(textures[page.name]);
+    if(!page.texture && textures[page.name]) page.setTexture(textures[page.name]);
   });
 
   const atlasLoader = new spineNS.AtlasAttachmentLoader(atlas);
@@ -2265,7 +2953,14 @@ async function renderSpineModel(spineNS, model){
     skeletonData = skeletonBinary.readSkeletonData(new Uint8Array(skelRes));
   } catch (err) {
     console.error("Binary parse failed:", err);
-    throw new Error(`Incompatible Spine runtime version (${model.version || 'unknown'}). Failed to parse skeleton data.`);
+    // Surfacing the real underlying error message here (instead of always
+    // masking it behind the generic "Incompatible Spine runtime version"
+    // line) so a genuine parse failure is diagnosable from a screenshot
+    // alone, without needing devtools/remote debugging on mobile. If this
+    // turns out to be version drift after all, the real message usually
+    // says so directly (e.g. a specific "invalid ... type" or out-of-range
+    // read) rather than needing to be inferred from a generic wrapper.
+    throw new Error(`Failed to parse skeleton data (Spine ${model.version || 'unknown'}): ${err && err.message ? err.message : err}`);
   }
 
   // Spine 4.2+ requires updateWorldTransform() to receive a Physics enum
@@ -2367,147 +3062,11 @@ async function renderSpineModel(spineNS, model){
   const camPad = 1.15;
   const boundsAspect = bounds.size.x / bounds.size.y;
   const homeCenter = { x: bounds.offset.x + bounds.size.x / 2, y: bounds.offset.y + bounds.size.y / 2 };
-
   const camView = { offsetX: 0, offsetY: 0, zoom: 1 };
-  function resetCamera(){
-    camView.offsetX = 0;
-    camView.offsetY = 0;
-    camView.zoom = 1;
-  }
-
-  l2dResetCam.onclick = resetCamera;
-
-  // Pointer-based pan (mouse drag or single-finger touch) and pinch-to-zoom
-  // (two-finger touch) directly on the stage. Wheel also zooms for desktop.
-  const pointers = new Map();
-  let pinchStartDist = 0;
-  let pinchStartZoom = 1;
-  let lastPanX = 0, lastPanY = 0;
-
-  function stagePxToWorld(px){
-    // Convert a screen-pixel delta to world-space delta at current zoom,
-    // using the canvas's current world-units-per-pixel scale.
-    const canvasAspect = canvas.width / canvas.height;
-    let viewH = bounds.size.y * camPad / camView.zoom;
-    let viewW = viewH * canvasAspect;
-    if (canvasAspect <= boundsAspect) {
-      viewW = bounds.size.x * camPad / camView.zoom;
-      viewH = viewW / canvasAspect;
-    }
-    return px * (viewW / canvas.clientWidth);
-  }
-
-  // Same "contain" fit math the render loop uses for viewW/viewH, but at
-  // zoom=1 (i.e. independent of the current zoom level) — needed so
-  // screenToWorld/zoomAround can compute a stable world position for a
-  // screen point regardless of what zoom is in effect when they're called.
-  function baseViewSize(){
-    const canvasAspect = canvas.width / canvas.height;
-    let viewW, viewH;
-    if (canvasAspect > boundsAspect) {
-      viewH = bounds.size.y * camPad;
-      viewW = viewH * canvasAspect;
-    } else {
-      viewW = bounds.size.x * camPad;
-      viewH = viewW / canvasAspect;
-    }
-    return { viewW, viewH };
-  }
-
-  // Screen (client) coords -> world coords, using the camera's current
-  // center and zoom. Mirrors exactly what the renderer does each frame
-  // (camera.position +/- half the current viewport size), so a point
-  // computed here lines up with what's actually drawn under that pixel.
-  function screenToWorld(clientX, clientY){
-    const rect = canvas.getBoundingClientRect();
-    const nx = (clientX - rect.left) / rect.width - 0.5;   // -0.5..0.5 across canvas
-    const ny = (clientY - rect.top) / rect.height - 0.5;
-    const { viewW, viewH } = baseViewSize();
-    const centerX = homeCenter.x + camView.offsetX;
-    const centerY = homeCenter.y + camView.offsetY;
-    return {
-      x: centerX + nx * (viewW / camView.zoom),
-      y: centerY - ny * (viewH / camView.zoom) // screen Y inverted vs world Y
-    };
-  }
-
-  // Change zoom while keeping the world point currently under (clientX,
-  // clientY) fixed under that same screen point — i.e. zoom "toward" that
-  // point instead of toward the fixed camera center. Without this, changing
-  // zoom alone (leaving offsetX/offsetY untouched) keeps the camera looking
-  // at the same world center while the visible span shrinks/grows around
-  // it, so whatever is under your fingers/cursor visibly drifts away as you
-  // zoom — which was the reported bug.
-  function zoomAround(clientX, clientY, newZoom){
-    newZoom = Math.min(8, Math.max(0.2, newZoom));
-    const before = screenToWorld(clientX, clientY);
-    camView.zoom = newZoom;
-    const after = screenToWorld(clientX, clientY);
-    camView.offsetX += before.x - after.x;
-    camView.offsetY += before.y - after.y;
-  }
-
-  l2dStage.addEventListener('pointerdown', (e) => {
-    if(e.target.closest('#l2d-status')) return;
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    l2dStage.setPointerCapture(e.pointerId);
-    if(pointers.size === 1){
-      l2dStage.classList.add('panning');
-      lastPanX = e.clientX; lastPanY = e.clientY;
-    } else if(pointers.size === 2){
-      const pts = [...pointers.values()];
-      pinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-      pinchStartZoom = camView.zoom;
-    }
+  const spineCameraApi = setupCameraForStage({
+    stage: l2dStage, canvas, resetBtn: l2dResetCam,
+    bounds, homeCenter, boundsAspect, camPad, camView
   });
-  l2dStage.addEventListener('pointermove', (e) => {
-    if(!pointers.has(e.pointerId)) return;
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-    if(pointers.size === 1){
-      const dx = e.clientX - lastPanX;
-      const dy = e.clientY - lastPanY;
-      lastPanX = e.clientX; lastPanY = e.clientY;
-      camView.offsetX -= stagePxToWorld(dx);
-      camView.offsetY += stagePxToWorld(dy); // screen Y is inverted vs world Y
-    } else if(pointers.size === 2){
-      const pts = [...pointers.values()];
-      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-      const midX = (pts[0].x + pts[1].x) / 2;
-      const midY = (pts[0].y + pts[1].y) / 2;
-      if(pinchStartDist > 0){
-        zoomAround(midX, midY, pinchStartZoom * (dist / pinchStartDist));
-      }
-    }
-  });
-  function releasePointer(e){
-    pointers.delete(e.pointerId);
-    if(pointers.size === 0) l2dStage.classList.remove('panning');
-    if(pointers.size < 2) pinchStartDist = 0;
-    if(pointers.size === 1){
-      // Pinch (2 fingers) just dropped to a single remaining finger. Without
-      // this, lastPanX/lastPanY are still whatever they were from the last
-      // 1-finger state (stale — possibly from before the pinch even
-      // started), so the next pointermove computes dx/dy against a stale
-      // reference point instead of the remaining finger's actual position,
-      // producing one large spurious pan jump right as the lifted finger
-      // releases. Resync to the remaining finger's current position so
-      // panning continues smoothly from here with no jump.
-      const [remaining] = pointers.values();
-      lastPanX = remaining.x;
-      lastPanY = remaining.y;
-      l2dStage.classList.add('panning');
-    }
-  }
-  l2dStage.addEventListener('pointerup', releasePointer);
-  l2dStage.addEventListener('pointercancel', releasePointer);
-  l2dStage.addEventListener('pointerleave', releasePointer);
-
-  l2dStage.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const factor = Math.exp(-e.deltaY * 0.0015);
-    zoomAround(e.clientX, e.clientY, camView.zoom * factor);
-  }, { passive: false });
 
   let lastTime = Date.now() / 1000;
   function frame(){
@@ -2582,26 +3141,8 @@ async function renderSpineModel(spineNS, model){
     }
   }
 
-  l2dActive = { renderer, gl, skeleton, animState, raf: null, resizeCanvasToContainer, cleanupResize: () => window.removeEventListener('resize', resizeCanvasToContainer) };
+  l2dActive = { renderer, gl, skeleton, animState, raf: null, resizeCanvasToContainer, cleanupResize: () => { window.removeEventListener('resize', resizeCanvasToContainer); spineCameraApi.teardown(); } };
   frame();
-}
-
-// Extracts page (texture) file names from a Spine .atlas text file.
-// Atlas format: page name is a line with no ":" that precedes lines like
-// "size:", "format:", "filter:", "repeat:" — a simple, well-documented
-// plain-text format (not proprietary), so this is a straightforward parse.
-function parseAtlasPageNames(atlasText){
-  const lines = atlasText.split(/\r?\n/);
-  const pages = [];
-  for(let i = 0; i < lines.length; i++){
-    const line = lines[i].trim();
-    if(line === '') continue;
-    const next = (lines[i+1] || '').trim();
-    if(next.startsWith('size:')){
-      pages.push(line);
-    }
-  }
-  return pages;
 }
 
 function populateAnimButtons(names, activeName, onSelect){
@@ -2738,6 +3279,394 @@ function closeLightbox(){
   lightbox.classList.remove('open');
   document.body.classList.remove('modal-open');
   lbMedia.innerHTML = '';
+}
+
+// ---------- Cubism player ----------
+const cubismPlayer = document.getElementById('cubism-player');
+const cubismCanvas = document.getElementById('cubism-canvas');
+const cubismStatusEl = document.getElementById('cubism-status');
+const cubismStage = document.getElementById('cubism-stage');
+const cubismPath = document.getElementById('cubism-path');
+const cubismHasPhysics = document.getElementById('cubism-has-physics');
+const cubismModelName = document.getElementById('cubism-model-name');
+const cubismDrawerTitle = document.getElementById('cubism-drawer-title');
+const cubismNowPlayingName = document.getElementById('cubism-now-playing-name');
+const cubismMotionGroupsEl = document.getElementById('cubism-motion-groups');
+const cubismExpressionGroupEl = document.getElementById('cubism-expression-group');
+const cubismGithub = document.getElementById('cubism-github');
+const cubismPlayToggle = document.getElementById('cubism-play-toggle');
+const cubismResetCam = document.getElementById('cubism-reset-cam');
+const cubismTransportToggle = document.getElementById('cubism-transport-toggle');
+const cubismTransportPanel = document.getElementById('cubism-transport-panel');
+const cubismDrawer = document.getElementById('cubism-drawer');
+const cubismDrawerHandle = document.getElementById('cubism-drawer-handle');
+const cubismDevInfoToggle = document.getElementById('cubism-dev-info-toggle');
+const cubismDevInfoBody = document.getElementById('cubism-dev-info-body');
+
+function cubismSetStatus(html){
+  cubismStatusEl.classList.remove('hidden');
+  cubismStatusEl.innerHTML = html;
+}
+function cubismHideStatus(){
+  cubismStatusEl.classList.add('hidden');
+}
+
+let cubismActiveModelKey = null;
+let cubismActive = null; // { framework, model, renderer, gl, raf, cleanupResize, motionPaused }
+
+function setCubismDrawerOpen(open){
+  cubismDrawer.classList.toggle('open', open);
+}
+cubismDrawerHandle.addEventListener('click', () => {
+  setCubismDrawerOpen(!cubismDrawer.classList.contains('open'));
+});
+cubismDrawerHandle.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter' || e.key === ' '){
+    e.preventDefault();
+    cubismDrawerHandle.click();
+  }
+});
+
+function setCubismTransportOpen(open){
+  cubismTransportPanel.classList.toggle('open', open);
+}
+cubismTransportToggle.addEventListener('click', () => {
+  setCubismTransportOpen(!cubismTransportPanel.classList.contains('open'));
+});
+
+cubismDevInfoToggle.addEventListener('click', () => {
+  const open = !cubismDevInfoBody.classList.contains('open');
+  cubismDevInfoBody.classList.toggle('open', open);
+  cubismDevInfoToggle.classList.toggle('open', open);
+});
+
+function teardownCubismActive(){
+  if(cubismActive){
+    if(cubismActive.raf) cancelAnimationFrame(cubismActive.raf);
+    if(cubismActive.cleanupResize) cubismActive.cleanupResize();
+    // Per the SDK manual (docs.live2d.com, "Discard the model"): destroy
+    // the CubismUserModel-derived instance's held model to release its
+    // motions/expressions/physics — CubismFramework itself is left
+    // running (its manual explicitly notes init state is static/shared
+    // across models, so there's no need to dispose() it just to switch
+    // models; only the per-model instance needs releasing here).
+    try{ cubismActive.model?.release?.(); } catch(e){ console.warn('Cubism model release failed', e); }
+    cubismActive = null;
+  }
+}
+
+function closeCubismPlayer(){
+  cubismPlayer.classList.remove('open');
+  document.body.classList.remove('modal-open');
+  setCubismDrawerOpen(false);
+  teardownCubismActive();
+}
+document.getElementById('cubism-close').addEventListener('click', closeCubismPlayer);
+cubismPlayer.addEventListener('click', e => { if(e.target === cubismPlayer) closeCubismPlayer(); });
+
+document.addEventListener('keydown', (e) => {
+  if(!cubismPlayer.classList.contains('open')) return;
+  const tag = e.target?.tagName;
+  if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target?.isContentEditable) return;
+  if(e.key === 'Escape'){ e.preventDefault(); closeCubismPlayer(); return; }
+  if(e.key.toLowerCase() === 'r'){ e.preventDefault(); cubismResetCam.click(); return; }
+  if(e.code === 'Space'){ e.preventDefault(); cubismPlayToggle.click(); }
+});
+
+cubismPlayToggle.addEventListener('click', () => {
+  if(!cubismActive) return;
+  cubismActive.motionPaused = !cubismActive.motionPaused;
+  cubismPlayToggle.classList.toggle('active', !cubismActive.motionPaused);
+});
+
+function populateCubismMotionButtons(model){
+  cubismMotionGroupsEl.innerHTML = '';
+  Object.entries(model.motionGroups).forEach(([groupName, motions]) => {
+    if(motions.length === 0) return;
+    const groupEl = document.createElement('div');
+    groupEl.className = 'l2d-anim-group';
+    if(groupName){
+      const label = document.createElement('div');
+      label.className = 'l2d-anim-group-label';
+      label.textContent = groupName;
+      groupEl.appendChild(label);
+    }
+    const row = document.createElement('div');
+    row.className = 'l2d-anim-row';
+    motions.forEach(motion => {
+      const btn = document.createElement('button');
+      btn.className = 'l2d-anim-btn';
+      btn.textContent = motion.name;
+      btn.addEventListener('click', () => {
+        row.querySelectorAll('.l2d-anim-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        cubismNowPlayingName.textContent = motion.name;
+        playCubismMotion(groupName, motions.indexOf(motion));
+      });
+      row.appendChild(btn);
+    });
+    groupEl.appendChild(row);
+    cubismMotionGroupsEl.appendChild(groupEl);
+  });
+}
+
+function populateCubismExpressionButtons(model){
+  cubismExpressionGroupEl.innerHTML = '';
+  if(model.expressionPaths.length === 0) return;
+  const row = document.createElement('div');
+  row.className = 'l2d-anim-row';
+  model.expressionPaths.forEach(expr => {
+    const btn = document.createElement('button');
+    btn.className = 'l2d-anim-btn';
+    btn.textContent = expr.name;
+    btn.addEventListener('click', () => {
+      row.querySelectorAll('.l2d-anim-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      setCubismExpression(expr.name);
+    });
+    row.appendChild(btn);
+  });
+  cubismExpressionGroupEl.appendChild(row);
+}
+
+function playCubismMotion(groupName, index){
+  if(!cubismActive) return;
+  const { model, framework } = cubismActive;
+  // Priority mirrors the SDK's own PriorityNormal (2) — confirmed against
+  // Framework's acubismmotion.ts constants — high enough that a
+  // user-selected motion always takes over an idle/default one.
+  model.startMotion(groupName, index, 2);
+}
+
+function setCubismExpression(name){
+  if(!cubismActive) return;
+  cubismActive.model.setExpression(name);
+}
+
+async function openCubismPlayer(model){
+  cubismActiveModelKey = model.key;
+  cubismPath.textContent = model.folderPath;
+  cubismModelName.textContent = model.name;
+  cubismDrawerTitle.textContent = model.name || 'Model details';
+  cubismNowPlayingName.textContent = '—';
+  cubismHasPhysics.textContent = model.physicsPath ? 'Yes' : 'No';
+  cubismGithub.href = BLOB_BASE + model.folderPath.split('/').map(encodeURIComponent).join('/');
+  cubismMotionGroupsEl.innerHTML = '';
+  cubismExpressionGroupEl.innerHTML = '';
+  cubismSetStatus(`<div class="spinner"></div><div>Loading Cubism runtime…</div>`);
+  cubismPlayer.classList.add('open');
+  document.body.classList.add('modal-open');
+  setCubismDrawerOpen(false);
+  setCubismTransportOpen(false);
+  teardownCubismActive();
+
+  let framework;
+  try{
+    framework = await loadCubismRuntime();
+  } catch(e){
+    if(cubismActiveModelKey !== model.key) return;
+    cubismSetStatus(`Couldn't load the Cubism runtime.<br><span style="opacity:0.7;font-size:12px">${e.message || e}</span>`);
+    return;
+  }
+  if(cubismActiveModelKey !== model.key) return;
+
+  cubismSetStatus(`<div class="spinner"></div><div>Loading model…</div>`);
+  try{
+    await renderCubismModel(framework, model);
+    if(cubismActiveModelKey !== model.key) return;
+    cubismHideStatus();
+    populateCubismMotionButtons(model);
+    populateCubismExpressionButtons(model);
+  } catch(e){
+    console.error('Cubism render failed for', model.folderPath, e);
+    if(cubismActiveModelKey !== model.key) return;
+    cubismSetStatus(`This model failed to render.<br><span style="opacity:0.7;font-size:12px">${(e && e.message) ? e.message : 'Unknown error'}</span>`);
+  }
+}
+
+// One-time CubismFramework startUp()/initialize() — per the SDK manual
+// ("How to Use CubismWebFramework Directly", Initialize CubismFramework /
+// Tips sections): data initialized here is static and shared across every
+// model, so this only needs to run once per page session, not per model.
+let cubismFrameworkStarted = false;
+function ensureCubismFrameworkStarted(framework){
+  if(cubismFrameworkStarted) return;
+  const option = new framework.Option();
+  option.logFunction = (msg) => console.log('[Cubism]', msg);
+  option.loggingLevel = framework.LogLevel.LogLevel_Warning;
+  framework.CubismFramework.startUp(option);
+  framework.CubismFramework.initialize();
+  cubismFrameworkStarted = true;
+}
+
+async function renderCubismModel(framework, model){
+  ensureCubismFrameworkStarted(framework);
+
+  const canvas = cubismCanvas;
+  const dpr = window.devicePixelRatio || 1;
+  const resizeCanvasToContainer = () => {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+  };
+  resizeCanvasToContainer();
+  window.addEventListener('resize', resizeCanvasToContainer);
+
+  const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: true })
+    || canvas.getContext('experimental-webgl', { alpha: true, premultipliedAlpha: true });
+  if(!gl) throw new Error('WebGL is not available in this browser.');
+
+  // Per the SDK manual's "Load the model" section: parsing .model3.json
+  // uses CubismModelSettingJson, and the actual per-file paths (Moc,
+  // Textures, Motions, Expressions, Physics, ...) it exposes are the same
+  // ones already resolved in discoverCubismModels — fetched again here
+  // fresh, matching how the manual describes ICubismModelSetting being
+  // read at load time rather than cached model-side.
+  const manifestUrl = RAW_BASE + model.modelJsonPath.split('/').map(encodeURIComponent).join('/');
+  const manifestText = await fetch(manifestUrl).then(r => {
+    if(!r.ok) throw new Error(`Failed to fetch model3.json (HTTP ${r.status})`);
+    return r.text();
+  });
+  const manifestBytes = new TextEncoder().encode(manifestText);
+  const setting = new framework.CubismModelSettingJson(manifestBytes.buffer, manifestBytes.byteLength);
+
+  const cubismModel = new framework.CubismUserModel();
+
+  const mocUrl = RAW_BASE + model.mocPath.split('/').map(encodeURIComponent).join('/');
+  const mocBuffer = await fetch(mocUrl).then(r => {
+    if(!r.ok) throw new Error(`Failed to fetch .moc3 (HTTP ${r.status})`);
+    return r.arrayBuffer();
+  });
+  cubismModel.loadModel(mocBuffer);
+
+  cubismModel.createRenderer();
+  const renderer = cubismModel.getRenderer();
+  renderer.startUp(gl);
+  renderer.setIsPremultipliedAlpha(true);
+
+  // Textures: fetched as plain <img> elements and bound the same way the
+  // Spine player's fetchTexture already does elsewhere in this file, then
+  // registered on the renderer by texture-slot index (the order Textures
+  // appears in .model3.json, per the manual's model-loading section).
+  await Promise.all(model.textureUrls.map((texPath, index) => new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      renderer.bindTexture(index, tex);
+      resolve();
+    };
+    img.onerror = () => reject(new Error(`Failed to load texture: ${texPath}`));
+    img.src = RAW_BASE + texPath.split('/').map(encodeURIComponent).join('/');
+  })));
+
+  if(model.physicsPath){
+    const physicsUrl = RAW_BASE + model.physicsPath.split('/').map(encodeURIComponent).join('/');
+    const buf = await fetch(physicsUrl).then(r => r.arrayBuffer());
+    cubismModel.loadPhysics(buf, buf.byteLength);
+  }
+  if(model.poseJsonPath){
+    const poseUrl = RAW_BASE + model.poseJsonPath.split('/').map(encodeURIComponent).join('/');
+    const buf = await fetch(poseUrl).then(r => r.arrayBuffer());
+    cubismModel.loadPose(buf, buf.byteLength);
+  }
+
+  // Every declared motion is preloaded up front (folder sizes here are
+  // small — confirmed directly, e.g. 25 motions for 300401_hongnujian —
+  // so this is a reasonable tradeoff against the complexity of lazy-
+  // loading motions on first play).
+  const loadedMotions = {};
+  for(const [groupName, motions] of Object.entries(model.motionGroups)){
+    for(const motion of motions){
+      const url = RAW_BASE + motion.path.split('/').map(encodeURIComponent).join('/');
+      const text = await fetch(url).then(r => r.text());
+      const m = cubismModel.loadMotion(text, text.length, `${groupName}_${motion.name}`);
+      loadedMotions[`${groupName}::${motion.name}`] = m;
+    }
+  }
+
+  for(const expr of model.expressionPaths){
+    const url = RAW_BASE + expr.path.split('/').map(encodeURIComponent).join('/');
+    const text = await fetch(url).then(r => r.text());
+    cubismModel.loadExpression(text, text.length, expr.name);
+  }
+
+  cubismModel.startMotion = (groupName, index, priority) => {
+    const motions = model.motionGroups[groupName] || [];
+    const entry = motions[index];
+    if(!entry) return;
+    // ACubismMotion instances loaded above are handed to the model's own
+    // motion manager via CubismUserModel's motion-playing path — Framework
+    // exposes this as part of CubismUserModel per the manual's Motion
+    // section reference; using the loaded instance directly here rather
+    // than re-deriving it keeps this in sync with what was actually
+    // preloaded above.
+    const loaded = loadedMotions[`${groupName}::${entry.name}`];
+    if(loaded) cubismModel._motionManager.startMotionPriority(loaded, false, priority);
+  };
+  cubismModel.setExpression = (name) => {
+    cubismModel._expressionManager?.startMotion?.(cubismModel._expressions?.getValue?.(name), false);
+  };
+
+  // Camera state reuses the exact same screen<->world math as the Spine
+  // player (stagePxToWorld/screenToWorld/zoomAround below are generic
+  // canvas/viewport math with no Spine-specific assumptions) — wired to
+  // this canvas/stage pair instead.
+  const bounds = { size: { x: 2, y: 2 } }; // Cubism's canonical model space is [-1,1] on both axes
+  const homeCenter = { x: 0, y: 0 };
+  const boundsAspect = 1;
+  const camPad = 1.35;
+  const camView = { zoom: 1, offsetX: 0, offsetY: 0 };
+  const cubismCameraApi = setupCameraForStage({
+    stage: cubismStage, canvas, resetBtn: cubismResetCam,
+    bounds, homeCenter, boundsAspect, camPad, camView
+  });
+
+  let lastTime = performance.now();
+  function frame(now){
+    const dt = Math.min(0.1, (now - lastTime) / 1000);
+    lastTime = now;
+
+    // Per the SDK manual's "Update process" section: eye tracking, physics,
+    // and motion playback are applied first, then CubismModel.update() is
+    // called once to actually recompute vertex data from Cubism Core.
+    if(!cubismActive.motionPaused){
+      cubismModel.getModel && cubismModel.update?.(dt);
+    }
+
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.BLEND);
+
+    const mvp = new framework.CubismMatrix44();
+    mvp.loadIdentity();
+    const canvasAspect = canvas.width / canvas.height;
+    const scale = camView.zoom;
+    if(canvasAspect > 1){
+      mvp.scale(scale / canvasAspect, scale);
+    } else {
+      mvp.scale(scale, scale * canvasAspect);
+    }
+    mvp.translateRelative(camView.offsetX, camView.offsetY);
+    renderer.setMvpMatrix(mvp);
+    renderer.drawModel();
+
+    cubismActive.raf = requestAnimationFrame(frame);
+  }
+
+  cubismActive = {
+    framework, model: cubismModel, renderer, gl, raf: null, motionPaused: false,
+    resizeCanvasToContainer,
+    cleanupResize: () => { window.removeEventListener('resize', resizeCanvasToContainer); cubismCameraApi.teardown(); }
+  };
+  cubismPlayToggle.classList.add('active');
+  cubismActive.raf = requestAnimationFrame(frame);
 }
 
 lbDownload.addEventListener('click', async () => {
