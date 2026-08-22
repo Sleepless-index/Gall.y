@@ -3748,7 +3748,7 @@ async function renderCubismModel(framework, model){
     }
     mvp.translateRelative(camView.offsetX, camView.offsetY);
     renderer.setMvpMatrix(mvp);
-    renderer.drawModel();
+    renderer.drawModel(new URL('vendor/shaders/webgl/', document.baseURI).href);
 
     cubismActive.raf = requestAnimationFrame(frame);
   }
