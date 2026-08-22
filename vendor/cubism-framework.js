@@ -3381,6 +3381,98 @@ var Live2DCubismFramework13;
   Live2DCubismFramework51.FrequestNode = FrequestNode;
 })(Live2DCubismFramework13 || (Live2DCubismFramework13 = {}));
 
+// src/effect/cubismbreath.ts
+var CubismBreath = class _CubismBreath {
+  /**
+   * コンストラクタ
+   */
+  constructor() {
+    __publicField(this, "_breathParameters");
+    // 呼吸にひもづいているパラメータのリスト
+    __publicField(this, "_currentTime");
+    this._currentTime = 0;
+  }
+  /**
+   * インスタンスの作成
+   */
+  static create() {
+    return new _CubismBreath();
+  }
+  /**
+   * インスタンスの破棄
+   * @param instance 対象のCubismBreath
+   */
+  static delete(instance) {
+    if (instance != null) {
+      instance = null;
+    }
+  }
+  /**
+   * 呼吸のパラメータの紐づけ
+   * @param breathParameters 呼吸を紐づけたいパラメータのリスト
+   */
+  setParameters(breathParameters) {
+    this._breathParameters = breathParameters;
+  }
+  /**
+   * 呼吸に紐づいているパラメータの取得
+   * @return 呼吸に紐づいているパラメータのリスト
+   */
+  getParameters() {
+    return this._breathParameters;
+  }
+  /**
+   * モデルのパラメータの更新
+   * @param model 対象のモデル
+   * @param deltaTimeSeconds デルタ時間[秒]
+   */
+  updateParameters(model, deltaTimeSeconds) {
+    this._currentTime += deltaTimeSeconds;
+    const t = this._currentTime * 2 * Math.PI;
+    for (let i = 0; i < this._breathParameters.length; ++i) {
+      const data = this._breathParameters[i];
+      model.addParameterValueById(
+        data.parameterId,
+        data.offset + data.peak * Math.sin(t / data.cycle),
+        data.weight
+      );
+    }
+  }
+  // 積算時間[秒]
+};
+var BreathParameterData = class {
+  /**
+   * コンストラクタ
+   * @param parameterId   呼吸をひもづけるパラメータID
+   * @param offset        呼吸を正弦波としたときの、波のオフセット
+   * @param peak          呼吸を正弦波としたときの、波の高さ
+   * @param cycle         呼吸を正弦波としたときの、波の周期
+   * @param weight        パラメータへの重み
+   */
+  constructor(parameterId, offset, peak, cycle, weight) {
+    __publicField(this, "parameterId");
+    // 呼吸をひもづけるパラメータID\
+    __publicField(this, "offset");
+    // 呼吸を正弦波としたときの、波のオフセット
+    __publicField(this, "peak");
+    // 呼吸を正弦波としたときの、波の高さ
+    __publicField(this, "cycle");
+    // 呼吸を正弦波としたときの、波の周期
+    __publicField(this, "weight");
+    this.parameterId = parameterId == void 0 ? null : parameterId;
+    this.offset = offset == void 0 ? 0 : offset;
+    this.peak = peak == void 0 ? 0 : peak;
+    this.cycle = cycle == void 0 ? 0 : cycle;
+    this.weight = weight == void 0 ? 0 : weight;
+  }
+  // パラメータへの重み
+};
+var Live2DCubismFramework14;
+((Live2DCubismFramework51) => {
+  Live2DCubismFramework51.BreathParameterData = BreathParameterData;
+  Live2DCubismFramework51.CubismBreath = CubismBreath;
+})(Live2DCubismFramework14 || (Live2DCubismFramework14 = {}));
+
 // src/effect/cubismeyeblink.ts
 var _CubismEyeBlink = class _CubismEyeBlink {
   /**
@@ -3554,11 +3646,11 @@ var EyeState = /* @__PURE__ */ ((EyeState2) => {
   EyeState2[EyeState2["EyeState_Opening"] = 4] = "EyeState_Opening";
   return EyeState2;
 })(EyeState || {});
-var Live2DCubismFramework14;
+var Live2DCubismFramework15;
 ((Live2DCubismFramework51) => {
   Live2DCubismFramework51.CubismEyeBlink = CubismEyeBlink;
   Live2DCubismFramework51.EyeState = EyeState;
-})(Live2DCubismFramework14 || (Live2DCubismFramework14 = {}));
+})(Live2DCubismFramework15 || (Live2DCubismFramework15 = {}));
 
 // src/effect/cubismlook.ts
 var CubismLook = class _CubismLook {
@@ -3638,11 +3730,11 @@ var LookParameterData = class {
   }
   // XY積ドラッグ入力に対する係数
 };
-var Live2DCubismFramework15;
+var Live2DCubismFramework16;
 ((Live2DCubismFramework51) => {
   Live2DCubismFramework51.LookParameterData = LookParameterData;
   Live2DCubismFramework51.CubismLook = CubismLook;
-})(Live2DCubismFramework15 || (Live2DCubismFramework15 = {}));
+})(Live2DCubismFramework16 || (Live2DCubismFramework16 = {}));
 
 // src/math/cubismviewmatrix.ts
 var CubismViewMatrix = class extends CubismMatrix44 {
@@ -3929,10 +4021,10 @@ var CubismViewMatrix = class extends CubismMatrix44 {
   }
   // 拡大率の最小値
 };
-var Live2DCubismFramework16;
+var Live2DCubismFramework17;
 ((Live2DCubismFramework51) => {
   Live2DCubismFramework51.CubismViewMatrix = CubismViewMatrix;
-})(Live2DCubismFramework16 || (Live2DCubismFramework16 = {}));
+})(Live2DCubismFramework17 || (Live2DCubismFramework17 = {}));
 
 // src/model/cubismmodelmultiplyandscreencolor.ts
 var ColorData = class {
@@ -6240,10 +6332,10 @@ var CubismModel = class {
   }
   // Offscreenのスクリーン色の配列
 };
-var Live2DCubismFramework17;
+var Live2DCubismFramework18;
 ((Live2DCubismFramework51) => {
   Live2DCubismFramework51.CubismModel = CubismModel;
-})(Live2DCubismFramework17 || (Live2DCubismFramework17 = {}));
+})(Live2DCubismFramework18 || (Live2DCubismFramework18 = {}));
 
 // src/model/cubismmoc.ts
 var CubismMoc = class _CubismMoc {
@@ -6275,28 +6367,7 @@ var CubismMoc = class _CubismMoc {
     const moc = Live2DCubismCore.Moc.fromArrayBuffer(mocBytes);
     if (moc) {
       cubismMoc = new _CubismMoc(moc);
-      // Cubism Core changed the JavaScript signature of csmGetMocVersion.
-      // Newer Cores use: csmGetMocVersion(mocBytes)
-      // Older Cores use: csmGetMocVersion(moc, mocBytes)
-      // The rest of the Framework is compatible with both, so bridge the
-      // signature here instead of letting the old Core receive `undefined`
-      // as its MOC byte buffer and throw "reading 'byteLength'".
-      const getMocVersion = Live2DCubismCore?.Version?.csmGetMocVersion;
-      let mocVersion = 0;
-      if (typeof getMocVersion === 'function') {
-        try {
-          mocVersion = getMocVersion(mocBytes);
-        } catch (newSignatureError) {
-          try {
-            mocVersion = getMocVersion(moc, mocBytes);
-          } catch (legacySignatureError) {
-            // Version metadata is diagnostic only; a valid Moc object is still
-            // usable, so do not reject an otherwise loadable model here.
-            mocVersion = 0;
-          }
-        }
-      }
-      cubismMoc._mocVersion = mocVersion;
+      cubismMoc._mocVersion = Live2DCubismCore.Version.csmGetMocVersion(mocBytes);
     }
     return cubismMoc;
   }
@@ -6363,18 +6434,7 @@ var CubismMoc = class _CubismMoc {
    * @returns .moc3 Version番号
    */
   static getMocVersionFromBuffer(mocBytes) {
-    const getMocVersion = Live2DCubismCore?.Version?.csmGetMocVersion;
-    if (typeof getMocVersion !== 'function') {
-      return 0;
-    }
-    try {
-      return getMocVersion(mocBytes);
-    } catch (newSignatureError) {
-      // Legacy Core signature: csmGetMocVersion(moc, mocBytes).
-      // This helper has no live Moc object, so there is no safe legacy call.
-      // Return unknown rather than surfacing the misleading byteLength error.
-      return 0;
-    }
+    return Live2DCubismCore.Version.csmGetMocVersion(mocBytes);
   }
   /**
    * .moc3 の整合性を検証する
@@ -6385,101 +6445,9 @@ var CubismMoc = class _CubismMoc {
   }
   // 読み込んだモデルの.moc3 Version
 };
-var Live2DCubismFramework18;
-((Live2DCubismFramework51) => {
-  Live2DCubismFramework51.CubismMoc = CubismMoc;
-})(Live2DCubismFramework18 || (Live2DCubismFramework18 = {}));
-
-// src/effect/cubismbreath.ts
-var CubismBreath = class _CubismBreath {
-  /**
-   * コンストラクタ
-   */
-  constructor() {
-    __publicField(this, "_breathParameters");
-    // 呼吸にひもづいているパラメータのリスト
-    __publicField(this, "_currentTime");
-    this._currentTime = 0;
-  }
-  /**
-   * インスタンスの作成
-   */
-  static create() {
-    return new _CubismBreath();
-  }
-  /**
-   * インスタンスの破棄
-   * @param instance 対象のCubismBreath
-   */
-  static delete(instance) {
-    if (instance != null) {
-      instance = null;
-    }
-  }
-  /**
-   * 呼吸のパラメータの紐づけ
-   * @param breathParameters 呼吸を紐づけたいパラメータのリスト
-   */
-  setParameters(breathParameters) {
-    this._breathParameters = breathParameters;
-  }
-  /**
-   * 呼吸に紐づいているパラメータの取得
-   * @return 呼吸に紐づいているパラメータのリスト
-   */
-  getParameters() {
-    return this._breathParameters;
-  }
-  /**
-   * モデルのパラメータの更新
-   * @param model 対象のモデル
-   * @param deltaTimeSeconds デルタ時間[秒]
-   */
-  updateParameters(model, deltaTimeSeconds) {
-    this._currentTime += deltaTimeSeconds;
-    const t = this._currentTime * 2 * Math.PI;
-    for (let i = 0; i < this._breathParameters.length; ++i) {
-      const data = this._breathParameters[i];
-      model.addParameterValueById(
-        data.parameterId,
-        data.offset + data.peak * Math.sin(t / data.cycle),
-        data.weight
-      );
-    }
-  }
-  // 積算時間[秒]
-};
-var BreathParameterData = class {
-  /**
-   * コンストラクタ
-   * @param parameterId   呼吸をひもづけるパラメータID
-   * @param offset        呼吸を正弦波としたときの、波のオフセット
-   * @param peak          呼吸を正弦波としたときの、波の高さ
-   * @param cycle         呼吸を正弦波としたときの、波の周期
-   * @param weight        パラメータへの重み
-   */
-  constructor(parameterId, offset, peak, cycle, weight) {
-    __publicField(this, "parameterId");
-    // 呼吸をひもづけるパラメータID\
-    __publicField(this, "offset");
-    // 呼吸を正弦波としたときの、波のオフセット
-    __publicField(this, "peak");
-    // 呼吸を正弦波としたときの、波の高さ
-    __publicField(this, "cycle");
-    // 呼吸を正弦波としたときの、波の周期
-    __publicField(this, "weight");
-    this.parameterId = parameterId == void 0 ? null : parameterId;
-    this.offset = offset == void 0 ? 0 : offset;
-    this.peak = peak == void 0 ? 0 : peak;
-    this.cycle = cycle == void 0 ? 0 : cycle;
-    this.weight = weight == void 0 ? 0 : weight;
-  }
-  // パラメータへの重み
-};
 var Live2DCubismFramework19;
 ((Live2DCubismFramework51) => {
-  Live2DCubismFramework51.BreathParameterData = BreathParameterData;
-  Live2DCubismFramework51.CubismBreath = CubismBreath;
+  Live2DCubismFramework51.CubismMoc = CubismMoc;
 })(Live2DCubismFramework19 || (Live2DCubismFramework19 = {}));
 
 // src/effect/cubismpose.ts
@@ -16316,8 +16284,10 @@ var Live2DCubismFramework50;
 })(Live2DCubismFramework50 || (Live2DCubismFramework50 = {}));
 export {
   ACubismMotion,
+  BreathParameterData,
   CSM_ASSERT,
   Constant,
+  CubismBreath,
   CubismBreathUpdater,
   CubismDebug,
   CubismDefaultParameterId,
